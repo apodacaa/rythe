@@ -215,6 +215,25 @@ def test_list_plain_output_shows_source(capsys):
     assert "[cli]" in out
 
 
+def test_list_plain_output_shows_body_preview_when_no_title(capsys):
+    main(["new", "--text", "Had a great run this morning along the river #running"])
+    capsys.readouterr()
+
+    assert main(["list"]) == 0
+    out = capsys.readouterr().out
+    assert "Had a great run this morning along the river" in out
+
+
+def test_list_plain_output_prefers_title_over_preview(capsys):
+    main(["new", "--title", "Morning Run", "--text", "completely different body text"])
+    capsys.readouterr()
+
+    assert main(["list"]) == 0
+    out = capsys.readouterr().out
+    assert "Morning Run" in out
+    assert "completely different body text" not in out
+
+
 def test_search_with_only_tag_finds_entry_without_a_query(capsys):
     main(["new", "--text", "morning run #running"])
     main(["new", "--text", "quiet evening #reading"])
@@ -224,6 +243,16 @@ def test_search_with_only_tag_finds_entry_without_a_query(capsys):
     out = capsys.readouterr().out
     assert "morning run" in out
     assert "quiet evening" not in out
+
+
+def test_search_plain_output_header_shows_preview(capsys):
+    main(["new", "--title", "Trail Day", "--text", "a coffee stop on the trail #coffee"])
+    capsys.readouterr()
+
+    assert main(["search", "coffee"]) == 0
+    out = capsys.readouterr().out
+    first_line = out.splitlines()[0]
+    assert "Trail Day" in first_line
 
 
 def test_search_with_no_query_and_no_filters_returns_usage_error(capsys):
@@ -280,6 +309,8 @@ def test_on_this_day_groups_by_year(capsys):
     assert "2025-09-30T090000" in out
     assert "2025-10-01T090000" not in out
     assert out.index("2025:") < out.index("2024:")
+    assert "last year" in out
+    assert "two years ago" in out
 
 
 def test_on_this_day_no_matches(capsys):

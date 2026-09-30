@@ -71,6 +71,18 @@ def _entry_to_dict(entry: Entry) -> dict:
     }
 
 
+def _preview(entry: Entry, length: int = 50) -> str:
+    """Title if set, else the first `length` characters of the body with whitespace collapsed
+    to single spaces — so plain-text listings show more than just a bare id and date.
+    """
+    if entry.title:
+        return entry.title
+    collapsed = " ".join(entry.body.split())
+    if len(collapsed) > length:
+        return collapsed[:length].rstrip() + "…"
+    return collapsed
+
+
 def cmd_new(args: argparse.Namespace) -> int:
     if args.editor:
         fd, tmp_name = tempfile.mkstemp(suffix=".md", prefix="journal-new-")
@@ -114,8 +126,9 @@ def cmd_list(args: argparse.Namespace) -> int:
         print(json.dumps([_entry_to_dict(e) for e in entries], indent=2))
     else:
         for e in entries:
-            title = f" {e.title}" if e.title else ""
-            print(f"{e.id}  [{e.source}]{title}")
+            preview = _preview(e)
+            suffix = f"  {preview}" if preview else ""
+            print(f"{e.id}  [{e.source}]{suffix}")
     return 0
 
 
@@ -152,8 +165,9 @@ def cmd_on_this_day(args: argparse.Namespace) -> int:
         if e.created.year != last_year:
             print(f"{e.created.year}:")
             last_year = e.created.year
-        title = f" {e.title}" if e.title else ""
-        print(f"  {e.id}  [{e.source}]{title}")
+        preview = _preview(e)
+        suffix = f"  {preview}" if preview else ""
+        print(f"  {e.id}  [{e.source}]{suffix}")
     return 0
 
 
@@ -187,7 +201,9 @@ def cmd_search(args: argparse.Namespace) -> int:
         print(json.dumps(payload, indent=2))
     else:
         for e, matches in results:
-            print(f"{e.id}:")
+            preview = _preview(e)
+            suffix = f"  {preview}" if preview else ""
+            print(f"{e.id}{suffix}:")
             for line in matches:
                 print(f"  {line}")
     return 0
