@@ -26,7 +26,8 @@ Examples:
   journal ingest seen "<abc@mail>"            # exit 0 if already ingested, else exit 1
   journal path
 
-With no subcommand, opens the TUI on a new entry (same as `journal write`).
+With no subcommand (or `journal write`), opens $EDITOR on a new entry — same as `journal new
+--editor`.
 """
 from __future__ import annotations
 
@@ -384,28 +385,22 @@ def cmd_model_list(args: argparse.Namespace) -> int:
 
 
 def cmd_write(args: argparse.Namespace) -> int:
-    try:
-        from .tui.app import JournalApp
-    except ModuleNotFoundError:
-        print("journal: the TUI isn't built yet (milestone 2)", file=sys.stderr)
-        return 1
-    JournalApp().run()
-    return 0
+    return main(["new", "--editor"])
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="journal",
-        description="A date/time-based personal journal: a vim-modal TUI to write, a CLI for everything else.",
+        description="A date/time-based personal journal: $EDITOR to write, a CLI for everything else.",
         epilog=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     sub = parser.add_subparsers(dest="command")
 
-    p_new = sub.add_parser("new", help="create an entry without the TUI")
+    p_new = sub.add_parser("new", help="create an entry: --text, stdin, or --editor")
     p_new.add_argument("--at", metavar="ISO", help="timestamp; default now")
     p_new.add_argument("--title", default="")
-    p_new.add_argument("--source", default="cli", choices=["tui", "cli", "memo", "text"])
+    p_new.add_argument("--source", default="cli", choices=["cli", "memo", "text"])
     p_new.add_argument("--text", help="entry body; reads stdin if omitted")
     p_new.add_argument(
         "-e", "--editor", action="store_true", help="compose in $EDITOR instead of --text/stdin"
@@ -420,7 +415,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_list.add_argument("--tag", action="append", help="repeatable; entry must have all given tags")
     p_list.add_argument("--exclude-tag", action="append", help="repeatable; entry must have none of these tags")
     p_list.add_argument("--untagged", action="store_true", help="only entries with no #tags at all")
-    p_list.add_argument("--source", choices=["tui", "cli", "memo", "text"])
+    p_list.add_argument("--source", choices=["cli", "memo", "text"])
     p_list.add_argument("--limit", type=int)
     p_list.add_argument("--json", action="store_true")
     p_list.set_defaults(func=cmd_list)
@@ -449,7 +444,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_otd.add_argument("--date", metavar="YYYY-MM-DD", help="default: today")
     p_otd.add_argument("--tag", action="append")
-    p_otd.add_argument("--source", choices=["tui", "cli", "memo", "text"])
+    p_otd.add_argument("--source", choices=["cli", "memo", "text"])
     p_otd.add_argument("--json", action="store_true")
     p_otd.set_defaults(func=cmd_on_this_day)
 
@@ -518,7 +513,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_model_list.add_argument("--json", action="store_true")
     p_model_list.set_defaults(func=cmd_model_list)
 
-    p_write = sub.add_parser("write", help="open the TUI (default with no command)")
+    p_write = sub.add_parser(
+        "write", help="open $EDITOR on a new entry (default with no command); same as `journal new --editor`"
+    )
     p_write.set_defaults(func=cmd_write)
 
     return parser

@@ -163,6 +163,34 @@ def test_new_editor_temp_file_is_cleaned_up(monkeypatch, journal_dir):
     assert not seen_path["path"].exists()
 
 
+def test_no_subcommand_opens_editor_same_as_new_editor(capsys, monkeypatch, journal_dir):
+    monkeypatch.setattr(
+        "journal.cli.subprocess.call",
+        lambda command: Path(command[-1]).write_text("from bare journal\n"),
+    )
+
+    assert main([]) == 0
+    entry_id = capsys.readouterr().out.split()[-1]
+
+    assert main(["show", entry_id, "--json"]) == 0
+    shown = json.loads(capsys.readouterr().out)
+    assert shown["body"].strip() == "from bare journal"
+
+
+def test_write_subcommand_is_the_same_as_new_editor(capsys, monkeypatch, journal_dir):
+    monkeypatch.setattr(
+        "journal.cli.subprocess.call",
+        lambda command: Path(command[-1]).write_text("from journal write\n"),
+    )
+
+    assert main(["write"]) == 0
+    entry_id = capsys.readouterr().out.split()[-1]
+
+    assert main(["show", entry_id, "--json"]) == 0
+    shown = json.loads(capsys.readouterr().out)
+    assert shown["body"].strip() == "from journal write"
+
+
 def test_list_since_accepts_natural_language(capsys):
     main(["new", "--text", "today's entry"])
     capsys.readouterr()

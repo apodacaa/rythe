@@ -2,9 +2,10 @@
 
 A personal, date/time-based journal. Two front doors onto the same data:
 
-- **TUI** (`journal`, no args): open, type, save, quit. This is for the human, not Claude.
-  Modal vim keybindings — see `src/journal/tui/keymap.py` for the full binding table, or `?`
-  inside the app.
+- **`journal` with no args (or `journal write`)**: opens `$EDITOR` on a new entry — same as
+  `journal new --editor`. This is for the human, not Claude. There's no custom TUI: a real
+  editor (vim/nvim, whatever `$EDITOR` resolves to) already does modal editing, themes, help
+  and crash recovery better than a hand-rolled one would.
 - **CLI** (`journal <command>`): this is the tool Claude uses. It never calls Claude or any
   API itself — it's plain data plumbing (create/list/show/search/tag/ingest). Every command has
   `--help`; most support `--json`.

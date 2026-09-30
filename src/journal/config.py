@@ -25,12 +25,8 @@ class MemoConfig:
 
 @dataclass
 class Config:
-    theme: str = "tokyo-night"
-    start_mode: str = "insert"
     transcribe: TranscribeConfig = field(default_factory=TranscribeConfig)
     memo: MemoConfig = field(default_factory=MemoConfig)
-    # keys[mode][action] = ["k1", "k2", ...] overrides for src/journal/tui/keymap.py
-    keys: dict[str, dict[str, list[str]]] = field(default_factory=dict)
 
 
 def load_config() -> Config:
@@ -42,9 +38,6 @@ def load_config() -> Config:
         raw = tomllib.load(f)
 
     return Config(
-        theme=raw.get("theme", "tokyo-night"),
-        start_mode=raw.get("start_mode", "insert"),
         transcribe=TranscribeConfig(**raw.get("transcribe", {})),
         memo=MemoConfig(**raw.get("memo", {})),
-        keys=raw.get("keys", {}),
     )
