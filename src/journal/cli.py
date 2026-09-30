@@ -48,6 +48,7 @@ def _entry_to_dict(entry: Entry) -> dict:
     return {
         "id": entry.id,
         "created": entry.created.isoformat(),
+        "updated": entry.updated.isoformat() if entry.updated else None,
         "source": entry.source,
         "title": entry.title,
         "message_id": entry.message_id,
@@ -184,14 +185,21 @@ def cmd_edit(args: argparse.Namespace) -> int:
         print(f"journal: no entry {args.id!r}", file=sys.stderr)
         return 2
 
+    before = path.read_text()
     subprocess.call(_editor_command() + [str(path)])
+    after = path.read_text()
+
+    if after == before:
+        print(f"edited {args.id} (no changes)")
+        return 0
 
     try:
-        Entry.from_markdown(args.id, path.read_text())
+        Entry.from_markdown(args.id, after)
     except ValueError as exc:
         print(f"journal: entry {args.id} may be corrupted after editing: {exc}", file=sys.stderr)
         return 1
 
+    store.touch(args.id, _now())
     print(f"edited {args.id}")
     return 0
 

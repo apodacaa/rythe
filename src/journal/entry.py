@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 _FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n?(.*)\Z", re.DOTALL)
-_FIELD_ORDER = ("created", "source", "title", "message_id", "audio", "transcriber")
+_FIELD_ORDER = ("created", "updated", "source", "title", "message_id", "audio", "transcriber")
 
 
 def id_for(created: datetime) -> str:
@@ -35,6 +35,7 @@ def _unquote(value: str) -> str:
 class Entry:
     id: str
     created: datetime
+    updated: datetime | None = None
     source: str = "cli"
     title: str = ""
     message_id: str | None = None
@@ -43,15 +44,21 @@ class Entry:
     body: str = ""
 
     def to_markdown(self) -> str:
-        lines = ["---", f"created: {self.created.isoformat()}", f"source: {self.source}"]
-        if self.title:
-            lines.append(f"title: {_quote(self.title)}")
-        if self.message_id:
-            lines.append(f"message_id: {self.message_id}")
-        if self.audio:
-            lines.append(f"audio: {self.audio}")
-        if self.transcriber:
-            lines.append(f"transcriber: {self.transcriber}")
+        values = {
+            "created": self.created.isoformat(),
+            "updated": self.updated.isoformat() if self.updated else None,
+            "source": self.source,
+            "title": self.title,
+            "message_id": self.message_id,
+            "audio": self.audio,
+            "transcriber": self.transcriber,
+        }
+        lines = ["---"]
+        for key in _FIELD_ORDER:
+            value = values[key]
+            if not value:
+                continue
+            lines.append(f"{key}: {_quote(value) if key == 'title' else value}")
         lines.append("---")
         header = "\n".join(lines)
         body = self.body
@@ -77,9 +84,12 @@ class Entry:
         if not created_raw:
             raise ValueError(f"entry {entry_id!r} is missing 'created'")
 
+        updated_raw = fields.get("updated")
+
         return cls(
             id=entry_id,
             created=datetime.fromisoformat(created_raw),
+            updated=datetime.fromisoformat(updated_raw) if updated_raw else None,
             source=fields.get("source", "cli"),
             title=fields.get("title", ""),
             message_id=fields.get("message_id") or None,

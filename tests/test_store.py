@@ -113,6 +113,25 @@ def test_add_tags_appends_only_missing_tags():
     assert "#focus" in updated.body
 
 
+def test_add_tags_sets_updated_when_a_tag_is_added():
+    entry = store.create(created=dt(8), body="had a day")
+    assert entry.updated is None
+
+    updated = store.add_tags(entry.id, ["focus"])
+
+    assert updated.updated is not None
+
+
+def test_add_tags_leaves_updated_alone_when_nothing_new():
+    entry = store.create(created=dt(8), body="#work already tagged")
+    first = store.add_tags(entry.id, ["work"])
+    assert first.updated is None  # "work" was already present, nothing changed
+
+    store.create(created=dt(9), body="unrelated")  # advance the clock a little
+    second = store.add_tags(entry.id, ["work"])
+    assert second.updated is None
+
+
 def test_add_tags_on_missing_entry_raises():
     with pytest.raises(store.EntryNotFoundError):
         store.add_tags("2026-01-01T000000", ["work"])
@@ -140,6 +159,22 @@ def test_delete_moves_entry_to_trash():
     assert "to be deleted" in trashed.read_text()
     with pytest.raises(store.EntryNotFoundError):
         store.get(entry.id)
+
+
+def test_touch_sets_updated():
+    entry = store.create(created=dt(8), body="hello")
+    assert entry.updated is None
+
+    when = dt(9, 30)
+    touched = store.touch(entry.id, when)
+
+    assert touched.updated == when
+    assert store.get(entry.id).updated == when
+
+
+def test_touch_missing_raises():
+    with pytest.raises(store.EntryNotFoundError):
+        store.touch("2026-01-01T000000", dt(8))
 
 
 def test_delete_missing_raises():

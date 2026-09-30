@@ -30,6 +30,23 @@ def test_round_trip_empty_title_and_body():
 
     assert restored.title == ""
     assert restored.body == ""
+    assert restored.updated is None
+
+
+def test_updated_omitted_from_markdown_when_none():
+    dt = datetime(2026, 9, 30, 16, 46, 8, tzinfo=TZ)
+    entry = Entry(id="x", created=dt)
+    assert "updated:" not in entry.to_markdown()
+
+
+def test_updated_round_trips_when_set():
+    created = datetime(2026, 9, 30, 16, 46, 8, tzinfo=TZ)
+    updated = datetime(2026, 10, 1, 9, 0, 0, tzinfo=TZ)
+    entry = Entry(id="x", created=created, updated=updated, body="edited body")
+
+    restored = Entry.from_markdown(entry.id, entry.to_markdown())
+
+    assert restored.updated == updated
 
 
 def test_title_with_colon_round_trips():

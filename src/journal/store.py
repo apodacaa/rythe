@@ -126,6 +126,17 @@ def path_for(entry_id: str) -> Path:
     return path
 
 
+def touch(entry_id: str, when: datetime) -> Entry:
+    """Set `updated` on an entry and rewrite it. For changes made outside this module, e.g. a
+    hand-edit via `journal edit` — callers should only call this when the content actually
+    changed, so `updated` doesn't drift just from opening and re-saving an entry untouched.
+    """
+    entry = get(entry_id)
+    entry.updated = when
+    path_for(entry_id).write_text(entry.to_markdown())
+    return entry
+
+
 def trash_root() -> Path:
     return data_dir() / ".trash"
 
@@ -230,5 +241,6 @@ def add_tags(entry_id: str, new_tags: list[str]) -> Entry:
             body += "\n"
         body += " ".join(f"#{t}" for t in missing) + "\n"
         entry.body = body
+        entry.updated = datetime.now().astimezone()
         _entry_path(entry.id).write_text(entry.to_markdown())
     return entry

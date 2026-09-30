@@ -91,7 +91,7 @@ def test_edit_missing_returns_exit_code_2(capsys):
     assert main(["edit", "2026-01-01T000000"]) == 2
 
 
-def test_edit_invokes_editor_on_entry_path_and_reports(monkeypatch, capsys, journal_dir):
+def test_edit_invokes_editor_appends_content_and_sets_updated(monkeypatch, capsys, journal_dir):
     main(["new", "--text", "before edit", "--json"])
     entry_id = json.loads(capsys.readouterr().out)["id"]
 
@@ -99,6 +99,8 @@ def test_edit_invokes_editor_on_entry_path_and_reports(monkeypatch, capsys, jour
 
     def fake_call(command):
         calls.append(command)
+        with open(command[-1], "a") as f:
+            f.write("added by the editor #edited\n")
         return 0
 
     monkeypatch.setattr("journal.cli.subprocess.call", fake_call)
@@ -106,12 +108,32 @@ def test_edit_invokes_editor_on_entry_path_and_reports(monkeypatch, capsys, jour
 
     assert main(["edit", entry_id]) == 0
     out = capsys.readouterr().out
-    assert f"edited {entry_id}" in out
+    assert out.strip() == f"edited {entry_id}"
 
     assert len(calls) == 1
     command = calls[0]
     assert command[:2] == ["nvim", "--clean"]
     assert command[-1].endswith(f"{entry_id}.md")
+
+    main(["show", entry_id, "--json"])
+    shown = json.loads(capsys.readouterr().out)
+    assert "edited" in shown["tags"]
+    assert shown["updated"] is not None
+
+
+def test_edit_with_no_changes_leaves_updated_none(monkeypatch, capsys, journal_dir):
+    main(["new", "--text", "untouched", "--json"])
+    entry_id = json.loads(capsys.readouterr().out)["id"]
+
+    monkeypatch.setattr("journal.cli.subprocess.call", lambda command: 0)
+
+    assert main(["edit", entry_id]) == 0
+    out = capsys.readouterr().out
+    assert "no changes" in out
+
+    main(["show", entry_id, "--json"])
+    shown = json.loads(capsys.readouterr().out)
+    assert shown["updated"] is None
 
 
 def test_edit_reports_corruption_without_reverting(monkeypatch, capsys, journal_dir):
