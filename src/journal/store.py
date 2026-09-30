@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import os
 from collections import Counter
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 from .entry import Entry, id_for
@@ -171,7 +171,10 @@ def list_entries(
     *,
     since: datetime | None = None,
     until: datetime | None = None,
+    on: date | None = None,
     tags: list[str] | None = None,
+    exclude_tags: list[str] | None = None,
+    untagged: bool = False,
     source: str | None = None,
     limit: int | None = None,
 ) -> list[Entry]:
@@ -181,11 +184,17 @@ def list_entries(
             continue
         if until and entry.created > until:
             continue
+        if on and entry.created.date() != on:
+            continue
         if source and entry.source != source:
             continue
-        if tags:
+        if tags or exclude_tags or untagged:
             entry_tags = set(extract_tags(entry.body))
-            if not set(tags).issubset(entry_tags):
+            if untagged and entry_tags:
+                continue
+            if tags and not set(tags).issubset(entry_tags):
+                continue
+            if exclude_tags and entry_tags & set(exclude_tags):
                 continue
         results.append(entry)
     results.sort(key=lambda e: e.created, reverse=True)
@@ -194,13 +203,33 @@ def list_entries(
     return results
 
 
+def on_this_day(target: date, *, tags: list[str] | None = None, source: str | None = None) -> list[Entry]:
+    """Entries written on this calendar month/day in any year — a "this day in history" view."""
+    results = []
+    for entry in iter_entries():
+        if (entry.created.month, entry.created.day) != (target.month, target.day):
+            continue
+        if source and entry.source != source:
+            continue
+        if tags:
+            entry_tags = set(extract_tags(entry.body))
+            if not set(tags).issubset(entry_tags):
+                continue
+        results.append(entry)
+    results.sort(key=lambda e: e.created, reverse=True)
+    return results
+
+
 def search(
     query: str | None = None,
     *,
     regex: bool = False,
     tags: list[str] | None = None,
+    exclude_tags: list[str] | None = None,
+    untagged: bool = False,
     since: datetime | None = None,
     until: datetime | None = None,
+    on: date | None = None,
 ) -> list[tuple[Entry, list[str]]]:
     import re as _re
 
@@ -212,11 +241,13 @@ def search(
         needle = query.lower()
         matcher = lambda line: needle in line.lower()  # noqa: E731
     else:
-        # No text query: caller is filtering by tag/since/until alone, so every line "matches".
+        # No text query: caller is filtering by tag/since/until/on alone, so every line "matches".
         matcher = lambda line: True  # noqa: E731
 
     results = []
-    for entry in list_entries(since=since, until=until, tags=tags):
+    for entry in list_entries(
+        since=since, until=until, on=on, tags=tags, exclude_tags=exclude_tags, untagged=untagged
+    ):
         matches = [line for line in entry.body.splitlines() if matcher(line)]
         if matches:
             results.append((entry, matches))

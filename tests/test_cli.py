@@ -62,6 +62,68 @@ def test_search_regex_without_query_returns_usage_error(capsys):
     assert "--regex needs a query" in capsys.readouterr().err
 
 
+def test_list_on_exact_date(capsys):
+    main(["new", "--at", "2026-09-30T08:00:00+02:00", "--text", "today"])
+    main(["new", "--at", "2026-10-01T08:00:00+02:00", "--text", "tomorrow"])
+    capsys.readouterr()
+
+    assert main(["list", "--on", "2026-09-30"]) == 0
+    out = capsys.readouterr().out
+    assert "2026-09-30T080000" in out
+    assert "2026-10-01T080000" not in out
+
+
+def test_list_exclude_tag(capsys):
+    main(["new", "--text", "a #work"])
+    main(["new", "--text", "b #personal"])
+    capsys.readouterr()
+
+    assert main(["list", "--exclude-tag", "work"]) == 0
+    out = capsys.readouterr().out
+    assert out.count("[cli]") == 1
+
+
+def test_list_untagged(capsys):
+    main(["new", "--text", "no tags"])
+    main(["new", "--text", "#work tagged"])
+    capsys.readouterr()
+
+    assert main(["list", "--untagged"]) == 0
+    out = capsys.readouterr().out
+    assert out.count("[cli]") == 1
+
+
+def test_on_this_day_groups_by_year(capsys):
+    main(["new", "--at", "2025-09-30T09:00:00+02:00", "--text", "last year"])
+    main(["new", "--at", "2024-09-30T09:00:00+02:00", "--text", "two years ago"])
+    main(["new", "--at", "2025-10-01T09:00:00+02:00", "--text", "wrong day"])
+    capsys.readouterr()
+
+    assert main(["on-this-day", "--date", "2026-09-30"]) == 0
+    out = capsys.readouterr().out
+    assert "2025:" in out
+    assert "2024:" in out
+    assert "2025-09-30T090000" in out
+    assert "2025-10-01T090000" not in out
+    assert out.index("2025:") < out.index("2024:")
+
+
+def test_on_this_day_no_matches(capsys):
+    assert main(["on-this-day", "--date", "2026-09-30"]) == 0
+    out = capsys.readouterr().out
+    assert "nothing written" in out
+
+
+def test_on_this_day_json(capsys):
+    main(["new", "--at", "2025-09-30T09:00:00+02:00", "--text", "last year #work"])
+    capsys.readouterr()
+
+    assert main(["on-this-day", "--date", "2026-09-30", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert len(payload) == 1
+    assert payload[0]["tags"] == ["work"]
+
+
 def test_tag_command_appends_and_reports(capsys):
     main(["new", "--text", "no tags yet", "--json"])
     entry_id = json.loads(capsys.readouterr().out)["id"]

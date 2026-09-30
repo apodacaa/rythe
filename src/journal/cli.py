@@ -10,6 +10,9 @@ Examples:
   journal show 2026-09-30T164608
   journal search "coffee" --tag morning
   journal search --tag work                  # tag filter alone, no text query
+  journal list --on 2026-09-30
+  journal list --untagged
+  journal on-this-day                        # entries from today's date in any past year
   journal tags
   journal tag 2026-09-30T164608 gratitude focus
   journal edit 2026-09-30T164608
@@ -27,7 +30,7 @@ import shlex
 import shutil
 import subprocess
 import sys
-from datetime import datetime
+from datetime import date, datetime
 
 from . import store
 from .entry import Entry
@@ -43,6 +46,10 @@ def _parse_when(value: str) -> datetime:
     if dt.tzinfo is None:
         dt = dt.astimezone()
     return dt
+
+
+def _parse_date(value: str) -> date:
+    return date.fromisoformat(value)
 
 
 def _entry_to_dict(entry: Entry) -> dict:
@@ -80,7 +87,10 @@ def cmd_list(args: argparse.Namespace) -> int:
     entries = store.list_entries(
         since=_parse_when(args.since) if args.since else None,
         until=_parse_when(args.until) if args.until else None,
+        on=_parse_date(args.on) if args.on else None,
         tags=[normalize_tag(t) for t in args.tag] if args.tag else None,
+        exclude_tags=[normalize_tag(t) for t in args.exclude_tag] if args.exclude_tag else None,
+        untagged=args.untagged,
         source=args.source,
         limit=args.limit,
     )
@@ -106,19 +116,52 @@ def cmd_show(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_on_this_day(args: argparse.Namespace) -> int:
+    target = _parse_date(args.date) if args.date else _now().date()
+    entries = store.on_this_day(
+        target,
+        tags=[normalize_tag(t) for t in args.tag] if args.tag else None,
+        source=args.source,
+    )
+    if args.json:
+        print(json.dumps([_entry_to_dict(e) for e in entries], indent=2))
+        return 0
+
+    if not entries:
+        print(f"nothing written on {target:%B %-d} in past years")
+        return 0
+
+    last_year = None
+    for e in entries:
+        if e.created.year != last_year:
+            print(f"{e.created.year}:")
+            last_year = e.created.year
+        title = f" {e.title}" if e.title else ""
+        print(f"  {e.id}  [{e.source}]{title}")
+    return 0
+
+
 def cmd_search(args: argparse.Namespace) -> int:
     if args.regex and not args.query:
         print("journal: --regex needs a query to match against", file=sys.stderr)
         return 1
-    if not args.query and not args.tag and not args.since and not args.until:
-        print("journal: search needs a query, or at least one of --tag/--since/--until", file=sys.stderr)
+    has_filter = args.tag or args.exclude_tag or args.untagged or args.since or args.until or args.on
+    if not args.query and not has_filter:
+        print(
+            "journal: search needs a query, or at least one of "
+            "--tag/--exclude-tag/--untagged/--since/--until/--on",
+            file=sys.stderr,
+        )
         return 1
     results = store.search(
         args.query,
         regex=args.regex,
         tags=[normalize_tag(t) for t in args.tag] if args.tag else None,
+        exclude_tags=[normalize_tag(t) for t in args.exclude_tag] if args.exclude_tag else None,
+        untagged=args.untagged,
         since=_parse_when(args.since) if args.since else None,
         until=_parse_when(args.until) if args.until else None,
+        on=_parse_date(args.on) if args.on else None,
     )
     if args.json:
         payload = [
@@ -246,7 +289,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_list = sub.add_parser("list", help="list entries, newest first")
     p_list.add_argument("--since", metavar="ISO")
     p_list.add_argument("--until", metavar="ISO")
+    p_list.add_argument("--on", metavar="YYYY-MM-DD", help="entries created on this exact date")
     p_list.add_argument("--tag", action="append", help="repeatable; entry must have all given tags")
+    p_list.add_argument("--exclude-tag", action="append", help="repeatable; entry must have none of these tags")
+    p_list.add_argument("--untagged", action="store_true", help="only entries with no #tags at all")
     p_list.add_argument("--source", choices=["tui", "cli", "memo", "text"])
     p_list.add_argument("--limit", type=int)
     p_list.add_argument("--json", action="store_true")
@@ -258,13 +304,27 @@ def build_parser() -> argparse.ArgumentParser:
     p_show.set_defaults(func=cmd_show)
 
     p_search = sub.add_parser("search", help="search entry bodies, line by line")
-    p_search.add_argument("query", nargs="?", help="text to match; omit to filter by --tag/--since/--until alone")
+    p_search.add_argument(
+        "query", nargs="?", help="text to match; omit to filter by --tag/--since/--until/--on alone"
+    )
     p_search.add_argument("--regex", action="store_true")
     p_search.add_argument("--tag", action="append")
+    p_search.add_argument("--exclude-tag", action="append", help="repeatable; entry must have none of these tags")
+    p_search.add_argument("--untagged", action="store_true", help="only entries with no #tags at all")
     p_search.add_argument("--since", metavar="ISO")
     p_search.add_argument("--until", metavar="ISO")
+    p_search.add_argument("--on", metavar="YYYY-MM-DD", help="entries created on this exact date")
     p_search.add_argument("--json", action="store_true")
     p_search.set_defaults(func=cmd_search)
+
+    p_otd = sub.add_parser(
+        "on-this-day", help="entries from this month/day across every year (default: today)"
+    )
+    p_otd.add_argument("--date", metavar="YYYY-MM-DD", help="default: today")
+    p_otd.add_argument("--tag", action="append")
+    p_otd.add_argument("--source", choices=["tui", "cli", "memo", "text"])
+    p_otd.add_argument("--json", action="store_true")
+    p_otd.set_defaults(func=cmd_on_this_day)
 
     p_tags = sub.add_parser("tags", help="tag counts across entries")
     p_tags.add_argument("--since", metavar="ISO")

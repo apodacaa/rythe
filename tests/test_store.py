@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -9,6 +9,10 @@ TZ = timezone(timedelta(hours=2))
 
 def dt(h, m=0, s=0):
     return datetime(2026, 9, 30, h, m, s, tzinfo=TZ)
+
+
+def dt_on(year, month, day, h=12):
+    return datetime(year, month, day, h, 0, 0, tzinfo=TZ)
 
 
 def test_create_writes_file_at_year_month_path(journal_dir):
@@ -48,6 +52,62 @@ def test_list_filters_by_since():
     results = store.list_entries(since=dt(12))
     assert len(results) == 1
     assert results[0].body.startswith("evening")
+
+
+def test_list_filters_by_on_exact_date():
+    store.create(created=dt_on(2026, 9, 30, 8), body="today")
+    store.create(created=dt_on(2026, 10, 1, 8), body="tomorrow")
+
+    results = store.list_entries(on=date(2026, 9, 30))
+
+    assert len(results) == 1
+    assert results[0].body.strip() == "today"
+
+
+def test_list_filters_by_exclude_tag():
+    store.create(created=dt(8), body="#work morning standup")
+    store.create(created=dt(9), body="#personal evening walk")
+
+    results = store.list_entries(exclude_tags=["work"])
+
+    assert len(results) == 1
+    assert "personal" in results[0].body
+
+
+def test_list_filters_by_untagged():
+    store.create(created=dt(8), body="no tags here")
+    store.create(created=dt(9), body="#work tagged")
+
+    results = store.list_entries(untagged=True)
+
+    assert len(results) == 1
+    assert results[0].body.strip() == "no tags here"
+
+
+def test_on_this_day_matches_month_and_day_across_years():
+    store.create(created=dt_on(2024, 9, 30), body="two years ago")
+    store.create(created=dt_on(2025, 9, 30), body="last year")
+    store.create(created=dt_on(2025, 10, 1), body="a day off, wrong date")
+    store.create(created=dt_on(2026, 9, 30), body="this year")
+
+    results = store.on_this_day(date(2026, 9, 30))
+
+    assert [e.body.strip() for e in results] == ["this year", "last year", "two years ago"]
+
+
+def test_on_this_day_respects_tag_filter():
+    store.create(created=dt_on(2025, 9, 30), body="#work last year")
+    store.create(created=dt_on(2024, 9, 30), body="#personal two years ago")
+
+    results = store.on_this_day(date(2026, 9, 30), tags=["work"])
+
+    assert len(results) == 1
+    assert "work" in results[0].body
+
+
+def test_on_this_day_no_matches_returns_empty_list():
+    store.create(created=dt_on(2025, 5, 1), body="unrelated date")
+    assert store.on_this_day(date(2026, 9, 30)) == []
 
 
 def test_list_sorted_newest_first():
@@ -91,6 +151,26 @@ def test_search_with_only_tag_filter_returns_full_body():
 def test_search_regex_without_query_raises():
     with pytest.raises(ValueError):
         store.search(regex=True)
+
+
+def test_search_with_exclude_tag():
+    store.create(created=dt(8), body="line about coffee #work")
+    store.create(created=dt(9), body="line about coffee #personal")
+
+    results = store.search("coffee", exclude_tags=["work"])
+
+    assert len(results) == 1
+    entry, _ = results[0]
+    assert "personal" in entry.body
+
+
+def test_search_with_on_date():
+    store.create(created=dt_on(2026, 9, 30, 8), body="coffee today")
+    store.create(created=dt_on(2026, 10, 1, 8), body="coffee tomorrow")
+
+    results = store.search("coffee", on=date(2026, 9, 30))
+
+    assert len(results) == 1
 
 
 def test_create_with_duplicate_message_id_raises():
