@@ -119,6 +119,43 @@ def get(entry_id: str) -> Entry:
     return Entry.from_markdown(entry_id, path.read_text())
 
 
+def path_for(entry_id: str) -> Path:
+    path = _find_path(entry_id)
+    if path is None:
+        raise EntryNotFoundError(entry_id)
+    return path
+
+
+def trash_root() -> Path:
+    return data_dir() / ".trash"
+
+
+def delete(entry_id: str) -> Path:
+    """Soft-delete: moves the entry (and its audio, if any) into .trash instead of unlinking it.
+
+    Returns the entry's new path in the trash.
+    """
+    path = _find_path(entry_id)
+    if path is None:
+        raise EntryNotFoundError(entry_id)
+    entry = Entry.from_markdown(entry_id, path.read_text())
+
+    stamp = datetime.now().strftime("%Y%m%dT%H%M%S")
+    trash_entries = trash_root() / "entries"
+    trash_entries.mkdir(parents=True, exist_ok=True)
+    dest = trash_entries / f"{entry_id}.{stamp}.md"
+    path.rename(dest)
+
+    if entry.audio:
+        audio_path = data_dir() / entry.audio
+        if audio_path.exists():
+            trash_audio = trash_root() / "audio"
+            trash_audio.mkdir(parents=True, exist_ok=True)
+            audio_path.rename(trash_audio / f"{audio_path.stem}.{stamp}{audio_path.suffix}")
+
+    return dest
+
+
 def list_entries(
     *,
     since: datetime | None = None,

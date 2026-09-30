@@ -11,6 +11,8 @@ Examples:
   journal search "coffee" --tag morning
   journal tags
   journal tag 2026-09-30T164608 gratitude focus
+  journal edit 2026-09-30T164608
+  journal delete 2026-09-30T164608
   journal path
 
 With no subcommand, opens the TUI on a new entry (same as `journal write`).
@@ -19,6 +21,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import shlex
+import shutil
+import subprocess
 import sys
 from datetime import datetime
 
@@ -142,6 +148,49 @@ def cmd_tag(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_delete(args: argparse.Namespace) -> int:
+    try:
+        trashed = store.delete(args.id)
+    except store.EntryNotFoundError:
+        print(f"journal: no entry {args.id!r}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps({"id": args.id, "trashed_at": str(trashed)}, indent=2))
+    else:
+        print(f"deleted {args.id} (moved to {trashed}, not purged)")
+    return 0
+
+
+def _editor_command() -> list[str]:
+    editor = os.environ.get("EDITOR")
+    if editor:
+        return shlex.split(editor)
+    for candidate in ("nvim", "vim", "vi"):
+        found = shutil.which(candidate)
+        if found:
+            return [found]
+    return ["vi"]
+
+
+def cmd_edit(args: argparse.Namespace) -> int:
+    try:
+        path = store.path_for(args.id)
+    except store.EntryNotFoundError:
+        print(f"journal: no entry {args.id!r}", file=sys.stderr)
+        return 2
+
+    subprocess.call(_editor_command() + [str(path)])
+
+    try:
+        Entry.from_markdown(args.id, path.read_text())
+    except ValueError as exc:
+        print(f"journal: entry {args.id} may be corrupted after editing: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"edited {args.id}")
+    return 0
+
+
 def cmd_path(args: argparse.Namespace) -> int:
     print(store.data_dir())
     return 0
@@ -208,6 +257,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_tag.add_argument("tags", nargs="+")
     p_tag.add_argument("--json", action="store_true")
     p_tag.set_defaults(func=cmd_tag)
+
+    p_delete = sub.add_parser("delete", help="move an entry to .trash under the data dir (not permanent)")
+    p_delete.add_argument("id")
+    p_delete.add_argument("--json", action="store_true")
+    p_delete.set_defaults(func=cmd_delete)
+
+    p_edit = sub.add_parser("edit", help="open an entry in $EDITOR (falls back to nvim, vim, then vi)")
+    p_edit.add_argument("id")
+    p_edit.set_defaults(func=cmd_edit)
 
     p_path = sub.add_parser("path", help="print the data directory")
     p_path.set_defaults(func=cmd_path)

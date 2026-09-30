@@ -69,3 +69,63 @@ def test_subcommand_help_exits_zero(capsys):
     with pytest.raises(SystemExit) as exc:
         main(["new", "--help"])
     assert exc.value.code == 0
+
+
+def test_delete_moves_entry_and_reports(capsys, journal_dir):
+    main(["new", "--text", "gone soon", "--json"])
+    entry_id = json.loads(capsys.readouterr().out)["id"]
+
+    assert main(["delete", entry_id]) == 0
+    out = capsys.readouterr().out
+    assert entry_id in out
+    assert "trash" in out
+
+    assert main(["show", entry_id]) == 2
+
+
+def test_delete_missing_returns_exit_code_2(capsys):
+    assert main(["delete", "2026-01-01T000000"]) == 2
+
+
+def test_edit_missing_returns_exit_code_2(capsys):
+    assert main(["edit", "2026-01-01T000000"]) == 2
+
+
+def test_edit_invokes_editor_on_entry_path_and_reports(monkeypatch, capsys, journal_dir):
+    main(["new", "--text", "before edit", "--json"])
+    entry_id = json.loads(capsys.readouterr().out)["id"]
+
+    calls = []
+
+    def fake_call(command):
+        calls.append(command)
+        return 0
+
+    monkeypatch.setattr("journal.cli.subprocess.call", fake_call)
+    monkeypatch.setenv("EDITOR", "nvim --clean")
+
+    assert main(["edit", entry_id]) == 0
+    out = capsys.readouterr().out
+    assert f"edited {entry_id}" in out
+
+    assert len(calls) == 1
+    command = calls[0]
+    assert command[:2] == ["nvim", "--clean"]
+    assert command[-1].endswith(f"{entry_id}.md")
+
+
+def test_edit_reports_corruption_without_reverting(monkeypatch, capsys, journal_dir):
+    main(["new", "--text", "before edit", "--json"])
+    entry_id = json.loads(capsys.readouterr().out)["id"]
+
+    def corrupt_the_file(command):
+        path = command[-1]
+        with open(path, "w") as f:
+            f.write("no frontmatter here")
+        return 0
+
+    monkeypatch.setattr("journal.cli.subprocess.call", corrupt_the_file)
+
+    assert main(["edit", entry_id]) == 1
+    err = capsys.readouterr().err
+    assert "may be corrupted" in err

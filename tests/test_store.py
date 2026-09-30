@@ -116,3 +116,48 @@ def test_add_tags_appends_only_missing_tags():
 def test_add_tags_on_missing_entry_raises():
     with pytest.raises(store.EntryNotFoundError):
         store.add_tags("2026-01-01T000000", ["work"])
+
+
+def test_path_for_returns_entry_path():
+    entry = store.create(created=dt(8), body="hello")
+    path = store.path_for(entry.id)
+    assert "hello" in path.read_text()
+
+
+def test_path_for_missing_raises():
+    with pytest.raises(store.EntryNotFoundError):
+        store.path_for("2026-01-01T000000")
+
+
+def test_delete_moves_entry_to_trash():
+    entry = store.create(created=dt(8), body="to be deleted")
+    original_path = store.path_for(entry.id)
+
+    trashed = store.delete(entry.id)
+
+    assert not original_path.exists()
+    assert trashed.exists()
+    assert "to be deleted" in trashed.read_text()
+    with pytest.raises(store.EntryNotFoundError):
+        store.get(entry.id)
+
+
+def test_delete_missing_raises():
+    with pytest.raises(store.EntryNotFoundError):
+        store.delete("2026-01-01T000000")
+
+
+def test_delete_moves_audio_too(journal_dir):
+    audio_file = journal_dir / "audio" / "clip.m4a"
+    audio_file.parent.mkdir(parents=True, exist_ok=True)
+    audio_file.write_bytes(b"fake audio")
+
+    entry = store.create(created=dt(8), body="a memo", source="memo", audio="audio/clip.m4a")
+
+    trashed = store.delete(entry.id)
+
+    assert not audio_file.exists()
+    trashed_audio = list((journal_dir / ".trash" / "audio").glob("clip.*.m4a"))
+    assert len(trashed_audio) == 1
+    assert trashed_audio[0].read_bytes() == b"fake audio"
+    assert trashed.exists()
