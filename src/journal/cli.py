@@ -9,6 +9,7 @@ Examples:
   journal list --since 2026-09-01 --tag work
   journal show 2026-09-30T164608
   journal search "coffee" --tag morning
+  journal search --tag work                  # tag filter alone, no text query
   journal tags
   journal tag 2026-09-30T164608 gratitude focus
   journal edit 2026-09-30T164608
@@ -106,6 +107,12 @@ def cmd_show(args: argparse.Namespace) -> int:
 
 
 def cmd_search(args: argparse.Namespace) -> int:
+    if args.regex and not args.query:
+        print("journal: --regex needs a query to match against", file=sys.stderr)
+        return 1
+    if not args.query and not args.tag and not args.since and not args.until:
+        print("journal: search needs a query, or at least one of --tag/--since/--until", file=sys.stderr)
+        return 1
     results = store.search(
         args.query,
         regex=args.regex,
@@ -251,7 +258,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_show.set_defaults(func=cmd_show)
 
     p_search = sub.add_parser("search", help="search entry bodies, line by line")
-    p_search.add_argument("query")
+    p_search.add_argument("query", nargs="?", help="text to match; omit to filter by --tag/--since/--until alone")
     p_search.add_argument("--regex", action="store_true")
     p_search.add_argument("--tag", action="append")
     p_search.add_argument("--since", metavar="ISO")

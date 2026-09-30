@@ -77,6 +77,22 @@ def test_search_regex():
     assert len(results) == 1
 
 
+def test_search_with_only_tag_filter_returns_full_body():
+    store.create(created=dt(8), body="line one\nline two #work")
+    store.create(created=dt(9), body="unrelated #personal")
+
+    results = store.search(tags=["work"])
+
+    assert len(results) == 1
+    entry, matches = results[0]
+    assert matches == ["line one", "line two #work"]
+
+
+def test_search_regex_without_query_raises():
+    with pytest.raises(ValueError):
+        store.search(regex=True)
+
+
 def test_create_with_duplicate_message_id_raises():
     store.create(created=dt(8), body="memo one", source="memo", message_id="<abc@mail>")
     with pytest.raises(store.DuplicateMessageError):

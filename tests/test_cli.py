@@ -41,6 +41,27 @@ def test_list_plain_output_shows_source(capsys):
     assert "[cli]" in out
 
 
+def test_search_with_only_tag_finds_entry_without_a_query(capsys):
+    main(["new", "--text", "morning run #running"])
+    main(["new", "--text", "quiet evening #reading"])
+    capsys.readouterr()
+
+    assert main(["search", "--tag", "running"]) == 0
+    out = capsys.readouterr().out
+    assert "morning run" in out
+    assert "quiet evening" not in out
+
+
+def test_search_with_no_query_and_no_filters_returns_usage_error(capsys):
+    assert main(["search"]) == 1
+    assert "needs a query" in capsys.readouterr().err
+
+
+def test_search_regex_without_query_returns_usage_error(capsys):
+    assert main(["search", "--regex"]) == 1
+    assert "--regex needs a query" in capsys.readouterr().err
+
+
 def test_tag_command_appends_and_reports(capsys):
     main(["new", "--text", "no tags yet", "--json"])
     entry_id = json.loads(capsys.readouterr().out)["id"]

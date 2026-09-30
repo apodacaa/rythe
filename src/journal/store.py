@@ -195,7 +195,7 @@ def list_entries(
 
 
 def search(
-    query: str,
+    query: str | None = None,
     *,
     regex: bool = False,
     tags: list[str] | None = None,
@@ -205,10 +205,15 @@ def search(
     import re as _re
 
     if regex:
+        if not query:
+            raise ValueError("regex search requires a query")
         matcher = _re.compile(query, _re.IGNORECASE).search
-    else:
+    elif query:
         needle = query.lower()
         matcher = lambda line: needle in line.lower()  # noqa: E731
+    else:
+        # No text query: caller is filtering by tag/since/until alone, so every line "matches".
+        matcher = lambda line: True  # noqa: E731
 
     results = []
     for entry in list_entries(since=since, until=until, tags=tags):
