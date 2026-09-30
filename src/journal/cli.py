@@ -59,7 +59,12 @@ def _entry_to_dict(entry: Entry) -> dict:
 
 
 def cmd_new(args: argparse.Namespace) -> int:
-    body = args.text if args.text is not None else sys.stdin.read()
+    if args.text is None:
+        if sys.stdin.isatty():
+            print("(type your entry, then Ctrl-D to save, or Ctrl-C to abort)", file=sys.stderr)
+        body = sys.stdin.read()
+    else:
+        body = args.text
     created = _parse_when(args.at) if args.at else _now()
     entry = store.create(created=created, body=body, source=args.source, title=args.title or "")
     if args.json:
