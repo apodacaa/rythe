@@ -126,6 +126,10 @@ def path_for(entry_id: str) -> Path:
     return path
 
 
+def _save(entry: Entry) -> None:
+    path_for(entry.id).write_text(entry.to_markdown())
+
+
 def touch(entry_id: str, when: datetime) -> Entry:
     """Set `updated` on an entry and rewrite it. For changes made outside this module, e.g. a
     hand-edit via `journal edit` — callers should only call this when the content actually
@@ -133,7 +137,17 @@ def touch(entry_id: str, when: datetime) -> Entry:
     """
     entry = get(entry_id)
     entry.updated = when
-    path_for(entry_id).write_text(entry.to_markdown())
+    _save(entry)
+    return entry
+
+
+def set_audio(entry_id: str, audio_relpath: str) -> Entry:
+    """Record an entry's audio file. Used after ingest_audio(), once the entry's id (and so the
+    audio file's name, which reuses it) is known.
+    """
+    entry = get(entry_id)
+    entry.audio = audio_relpath
+    _save(entry)
     return entry
 
 
@@ -278,5 +292,5 @@ def add_tags(entry_id: str, new_tags: list[str]) -> Entry:
         body += " ".join(f"#{t}" for t in missing) + "\n"
         entry.body = body
         entry.updated = datetime.now().astimezone()
-        _entry_path(entry.id).write_text(entry.to_markdown())
+        _save(entry)
     return entry

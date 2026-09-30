@@ -2,7 +2,105 @@ import json
 
 import pytest
 
+from journal import transcribe
 from journal.cli import main
+
+
+def test_ingest_text_creates_entry(capsys, tmp_path):
+    text_file = tmp_path / "transcript.txt"
+    text_file.write_text("pulled in from a file #ingested")
+
+    assert main(["ingest", "text", str(text_file), "--json"]) == 0
+    entry = json.loads(capsys.readouterr().out)
+
+    assert entry["source"] == "text"
+    assert "ingested" in entry["tags"]
+
+
+def test_ingest_text_missing_file_returns_exit_code_2(capsys):
+    assert main(["ingest", "text", "/no/such/file.txt"]) == 2
+
+
+def test_ingest_text_duplicate_message_id_returns_exit_code_3(capsys, tmp_path):
+    text_file = tmp_path / "transcript.txt"
+    text_file.write_text("first")
+
+    main(["ingest", "text", str(text_file), "--message-id", "<dup@mail>"])
+    capsys.readouterr()
+
+    assert main(["ingest", "text", str(text_file), "--message-id", "<dup@mail>"]) == 3
+
+
+def test_ingest_seen_reports_true_and_exit_0_when_ingested(capsys, tmp_path):
+    text_file = tmp_path / "transcript.txt"
+    text_file.write_text("body")
+    main(["ingest", "text", str(text_file), "--message-id", "<found@mail>"])
+    capsys.readouterr()
+
+    assert main(["ingest", "seen", "<found@mail>"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["seen"] is True
+    assert "id" in payload
+
+
+def test_ingest_seen_reports_false_and_exit_1_when_not_ingested(capsys):
+    assert main(["ingest", "seen", "<never@mail>"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload == {"seen": False}
+
+
+def test_ingest_audio_transcribes_and_creates_entry(capsys, tmp_path, monkeypatch, journal_dir):
+    transcribe.models_dir().mkdir(parents=True)
+    (transcribe.models_dir() / "ggml-small.bin").write_bytes(b"fake model")
+
+    audio_file = tmp_path / "memo.m4a"
+    audio_file.write_bytes(b"fake audio")
+
+    monkeypatch.setattr(
+        "journal.ingest.transcribe_audio", lambda path, *, model, language: "a transcribed memo"
+    )
+
+    assert main(["ingest", "audio", str(audio_file), "--json"]) == 0
+    entry = json.loads(capsys.readouterr().out)
+    assert entry["source"] == "memo"
+    assert entry["body"].strip() == "a transcribed memo"
+    assert entry["audio"] == f"audio/{entry['id']}.m4a"
+
+
+def test_ingest_audio_missing_model_returns_exit_1_with_clear_message(capsys, tmp_path, journal_dir):
+    audio_file = tmp_path / "memo.m4a"
+    audio_file.write_bytes(b"fake audio")
+
+    assert main(["ingest", "audio", str(audio_file)]) == 1
+    assert "isn't downloaded" in capsys.readouterr().err
+
+
+def test_model_list_shows_all_known_models(capsys, journal_dir):
+    assert main(["model", "list", "--json"]) == 0
+    models = json.loads(capsys.readouterr().out)
+    assert {m["name"] for m in models} == set(transcribe.KNOWN_MODELS)
+    assert all(m["downloaded"] is False for m in models)
+
+
+def test_model_download_writes_file(capsys, journal_dir, monkeypatch):
+    class FakeResponse:
+        headers = {"Content-Length": "5"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self, n):
+            return b""
+
+    monkeypatch.setattr("journal.transcribe.urllib.request.urlopen", lambda url: FakeResponse())
+
+    assert main(["model", "download", "tiny"]) == 0
+    out = capsys.readouterr().out
+    assert "downloaded tiny" in out
+    assert (transcribe.models_dir() / "ggml-tiny.bin").exists()
 
 
 def test_new_accepts_natural_language_at(capsys):

@@ -19,6 +19,10 @@ Examples:
   journal tag 2026-09-30T164608 gratitude focus
   journal edit 2026-09-30T164608
   journal delete 2026-09-30T164608
+  journal model download small
+  journal ingest audio memo.m4a --message-id "<abc@mail>"
+  journal ingest text transcript.txt --at 2026-09-30T16:46:08+02:00
+  journal ingest seen "<abc@mail>"            # exit 0 if already ingested, else exit 1
   journal path
 
 With no subcommand, opens the TUI on a new entry (same as `journal write`).
@@ -33,8 +37,9 @@ import shutil
 import subprocess
 import sys
 from datetime import datetime
+from pathlib import Path
 
-from . import store
+from . import ingest, store, transcribe
 from .dates import (
     parse_date as _parse_date,
     parse_datetime as _parse_when,
@@ -256,6 +261,98 @@ def cmd_path(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_ingest_audio(args: argparse.Namespace) -> int:
+    path = Path(args.file)
+    if not path.exists():
+        print(f"journal: no such file {args.file!r}", file=sys.stderr)
+        return 2
+
+    created = _parse_when(args.at) if args.at else _now()
+    try:
+        entry = ingest.ingest_audio(
+            path,
+            created=created,
+            message_id=args.message_id,
+            title=args.title or "",
+            model=args.model,
+            language=args.language,
+            force=args.force,
+        )
+    except store.DuplicateMessageError as exc:
+        print(f"journal: {exc}", file=sys.stderr)
+        return 3
+    except transcribe.TranscribeError as exc:
+        print(f"journal: {exc}", file=sys.stderr)
+        return 1
+
+    if args.json:
+        print(json.dumps(_entry_to_dict(entry), indent=2))
+    else:
+        print(f"ingested {entry.id}")
+    return 0
+
+
+def cmd_ingest_text(args: argparse.Namespace) -> int:
+    path = Path(args.file)
+    if not path.exists():
+        print(f"journal: no such file {args.file!r}", file=sys.stderr)
+        return 2
+
+    created = _parse_when(args.at) if args.at else _now()
+    try:
+        entry = ingest.ingest_text(
+            path, created=created, message_id=args.message_id, title=args.title or "", force=args.force
+        )
+    except store.DuplicateMessageError as exc:
+        print(f"journal: {exc}", file=sys.stderr)
+        return 3
+
+    if args.json:
+        print(json.dumps(_entry_to_dict(entry), indent=2))
+    else:
+        print(f"ingested {entry.id}")
+    return 0
+
+
+def cmd_ingest_seen(args: argparse.Namespace) -> int:
+    existing = store.find_by_message_id(args.message_id)
+    if existing is not None:
+        print(json.dumps({"seen": True, "id": existing.id}))
+        return 0
+    print(json.dumps({"seen": False}))
+    return 1
+
+
+def cmd_model_download(args: argparse.Namespace) -> int:
+    def progress(downloaded: int, total: int) -> None:
+        if total:
+            pct = downloaded * 100 // total
+            mb = downloaded // (1024 * 1024)
+            total_mb = total // (1024 * 1024)
+            print(f"\rdownloading {args.name}: {pct}% ({mb} / {total_mb} MB)", end="", file=sys.stderr)
+
+    try:
+        path = transcribe.download_model(args.name, force=args.force, progress=progress)
+    except transcribe.TranscribeError as exc:
+        print(f"\njournal: {exc}", file=sys.stderr)
+        return 1
+
+    print(file=sys.stderr)
+    print(f"downloaded {args.name} -> {path}")
+    return 0
+
+
+def cmd_model_list(args: argparse.Namespace) -> int:
+    models = transcribe.list_models()
+    if args.json:
+        print(json.dumps(models, indent=2))
+    else:
+        for m in models:
+            mark = "x" if m["downloaded"] else " "
+            print(f"[{mark}] {m['name']:8} {m['file']}")
+    return 0
+
+
 def cmd_write(args: argparse.Namespace) -> int:
     try:
         from .tui.app import JournalApp
@@ -346,6 +443,47 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_path = sub.add_parser("path", help="print the data directory")
     p_path.set_defaults(func=cmd_path)
+
+    p_ingest = sub.add_parser("ingest", help="pull external content (audio, text) into the journal")
+    ingest_sub = p_ingest.add_subparsers(dest="ingest_command", required=True)
+
+    p_ingest_audio = ingest_sub.add_parser("audio", help="transcribe an audio file and create an entry")
+    p_ingest_audio.add_argument("file")
+    p_ingest_audio.add_argument("--at", metavar="ISO", help="timestamp; default now")
+    p_ingest_audio.add_argument("--message-id", help="for dedupe; see `journal ingest seen`")
+    p_ingest_audio.add_argument("--title", default="")
+    p_ingest_audio.add_argument("--model", choices=list(transcribe.KNOWN_MODELS), help="default: config, else small")
+    p_ingest_audio.add_argument("--language", help="default: config, else en ('auto' to detect)")
+    p_ingest_audio.add_argument("--force", action="store_true", help="ingest even if --message-id was already seen")
+    p_ingest_audio.add_argument("--json", action="store_true")
+    p_ingest_audio.set_defaults(func=cmd_ingest_audio)
+
+    p_ingest_text = ingest_sub.add_parser("text", help="create an entry from a text/transcript file")
+    p_ingest_text.add_argument("file")
+    p_ingest_text.add_argument("--at", metavar="ISO", help="timestamp; default now")
+    p_ingest_text.add_argument("--message-id", help="for dedupe; see `journal ingest seen`")
+    p_ingest_text.add_argument("--title", default="")
+    p_ingest_text.add_argument("--force", action="store_true", help="ingest even if --message-id was already seen")
+    p_ingest_text.add_argument("--json", action="store_true")
+    p_ingest_text.set_defaults(func=cmd_ingest_text)
+
+    p_ingest_seen = ingest_sub.add_parser(
+        "seen", help="check whether a message-id was already ingested (exit 0 if so, else 1)"
+    )
+    p_ingest_seen.add_argument("message_id")
+    p_ingest_seen.set_defaults(func=cmd_ingest_seen)
+
+    p_model = sub.add_parser("model", help="manage local whisper.cpp models")
+    model_sub = p_model.add_subparsers(dest="model_command", required=True)
+
+    p_model_download = model_sub.add_parser("download", help="download a whisper.cpp model")
+    p_model_download.add_argument("name", nargs="?", default="small", choices=list(transcribe.KNOWN_MODELS))
+    p_model_download.add_argument("--force", action="store_true", help="re-download even if already present")
+    p_model_download.set_defaults(func=cmd_model_download)
+
+    p_model_list = model_sub.add_parser("list", help="list known models and whether they're downloaded")
+    p_model_list.add_argument("--json", action="store_true")
+    p_model_list.set_defaults(func=cmd_model_list)
 
     p_write = sub.add_parser("write", help="open the TUI (default with no command)")
     p_write.set_defaults(func=cmd_write)
