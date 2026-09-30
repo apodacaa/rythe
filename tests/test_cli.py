@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -107,6 +108,59 @@ def test_new_accepts_natural_language_at(capsys):
     assert main(["new", "--at", "yesterday", "--text", "backfilled", "--json"]) == 0
     created = json.loads(capsys.readouterr().out)
     assert created["created"]  # parsed to *some* valid ISO timestamp, not rejected
+
+
+def test_new_editor_composes_entry_from_editor_content(capsys, monkeypatch, journal_dir):
+    def fake_editor(path):
+        with open(path, "w") as f:
+            f.write("written in the editor #composed\n")
+        return 0
+
+    monkeypatch.setattr("journal.cli.subprocess.call", lambda command: fake_editor(command[-1]))
+
+    assert main(["new", "--editor", "--json"]) == 0
+    entry = json.loads(capsys.readouterr().out)
+    assert entry["body"].strip() == "written in the editor #composed"
+    assert entry["tags"] == ["composed"]
+
+
+def test_new_editor_passes_a_markdown_tmpfile_to_editor_command(capsys, monkeypatch, journal_dir):
+    calls = []
+
+    def fake_call(command):
+        calls.append(command)
+        Path(command[-1]).write_text("content\n")
+        return 0
+
+    monkeypatch.setattr("journal.cli.subprocess.call", fake_call)
+    monkeypatch.setenv("EDITOR", "nvim --clean")
+
+    assert main(["new", "--editor"]) == 0
+    assert calls[0][:2] == ["nvim", "--clean"]
+    assert calls[0][-1].endswith(".md")
+
+
+def test_new_editor_empty_file_aborts_without_creating_entry(capsys, monkeypatch, journal_dir):
+    monkeypatch.setattr("journal.cli.subprocess.call", lambda command: 0)  # editor writes nothing
+
+    assert main(["new", "--editor"]) == 1
+    assert "no entry created" in capsys.readouterr().err
+    assert main(["list"]) == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_new_editor_temp_file_is_cleaned_up(monkeypatch, journal_dir):
+    seen_path = {}
+
+    def fake_call(command):
+        seen_path["path"] = Path(command[-1])
+        seen_path["path"].write_text("hello\n")
+        return 0
+
+    monkeypatch.setattr("journal.cli.subprocess.call", fake_call)
+
+    main(["new", "--editor"])
+    assert not seen_path["path"].exists()
 
 
 def test_list_since_accepts_natural_language(capsys):

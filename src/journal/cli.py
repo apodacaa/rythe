@@ -5,6 +5,7 @@ calls Claude or any API itself.
 
 Examples:
   journal new --text "Had a good day #gratitude"
+  journal new --editor                        # compose in $EDITOR instead
   echo "typed from a script" | journal new --source cli
   journal list --since 2026-09-01 --tag work
   journal list --since yesterday              # natural language works too; ISO is preferred
@@ -36,6 +37,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -70,7 +72,19 @@ def _entry_to_dict(entry: Entry) -> dict:
 
 
 def cmd_new(args: argparse.Namespace) -> int:
-    if args.text is None:
+    if args.editor:
+        fd, tmp_name = tempfile.mkstemp(suffix=".md", prefix="journal-new-")
+        os.close(fd)
+        tmp_path = Path(tmp_name)
+        try:
+            subprocess.call(_editor_command() + [str(tmp_path)])
+            body = tmp_path.read_text()
+        finally:
+            tmp_path.unlink(missing_ok=True)
+        if not body.strip():
+            print("journal: no entry created (empty)", file=sys.stderr)
+            return 1
+    elif args.text is None:
         if sys.stdin.isatty():
             print("(type your entry, then Ctrl-D to save, or Ctrl-C to abort)", file=sys.stderr)
         body = sys.stdin.read()
@@ -377,6 +391,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_new.add_argument("--title", default="")
     p_new.add_argument("--source", default="cli", choices=["tui", "cli", "memo", "text"])
     p_new.add_argument("--text", help="entry body; reads stdin if omitted")
+    p_new.add_argument(
+        "-e", "--editor", action="store_true", help="compose in $EDITOR instead of --text/stdin"
+    )
     p_new.add_argument("--json", action="store_true")
     p_new.set_defaults(func=cmd_new)
 
