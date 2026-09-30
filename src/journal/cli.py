@@ -7,12 +7,14 @@ Examples:
   journal new --text "Had a good day #gratitude"
   echo "typed from a script" | journal new --source cli
   journal list --since 2026-09-01 --tag work
+  journal list --since yesterday              # natural language works too; ISO is preferred
   journal show 2026-09-30T164608
   journal search "coffee" --tag morning
   journal search --tag work                  # tag filter alone, no text query
   journal list --on 2026-09-30
   journal list --untagged
   journal on-this-day                        # entries from today's date in any past year
+  journal on-this-day --date monday           # bare weekday names work; "last monday" doesn't
   journal tags
   journal tag 2026-09-30T164608 gratitude focus
   journal edit 2026-09-30T164608
@@ -30,26 +32,21 @@ import shlex
 import shutil
 import subprocess
 import sys
-from datetime import date, datetime
+from datetime import datetime
 
 from . import store
+from .dates import (
+    parse_date as _parse_date,
+    parse_datetime as _parse_when,
+    parse_range_end as _parse_until,
+    parse_range_start as _parse_since,
+)
 from .entry import Entry
 from .tags import extract_tags, normalize_tag
 
 
 def _now() -> datetime:
     return datetime.now().astimezone()
-
-
-def _parse_when(value: str) -> datetime:
-    dt = datetime.fromisoformat(value)
-    if dt.tzinfo is None:
-        dt = dt.astimezone()
-    return dt
-
-
-def _parse_date(value: str) -> date:
-    return date.fromisoformat(value)
 
 
 def _entry_to_dict(entry: Entry) -> dict:
@@ -85,8 +82,8 @@ def cmd_new(args: argparse.Namespace) -> int:
 
 def cmd_list(args: argparse.Namespace) -> int:
     entries = store.list_entries(
-        since=_parse_when(args.since) if args.since else None,
-        until=_parse_when(args.until) if args.until else None,
+        since=_parse_since(args.since) if args.since else None,
+        until=_parse_until(args.until) if args.until else None,
         on=_parse_date(args.on) if args.on else None,
         tags=[normalize_tag(t) for t in args.tag] if args.tag else None,
         exclude_tags=[normalize_tag(t) for t in args.exclude_tag] if args.exclude_tag else None,
@@ -159,8 +156,8 @@ def cmd_search(args: argparse.Namespace) -> int:
         tags=[normalize_tag(t) for t in args.tag] if args.tag else None,
         exclude_tags=[normalize_tag(t) for t in args.exclude_tag] if args.exclude_tag else None,
         untagged=args.untagged,
-        since=_parse_when(args.since) if args.since else None,
-        until=_parse_when(args.until) if args.until else None,
+        since=_parse_since(args.since) if args.since else None,
+        until=_parse_until(args.until) if args.until else None,
         on=_parse_date(args.on) if args.on else None,
     )
     if args.json:
@@ -179,8 +176,8 @@ def cmd_search(args: argparse.Namespace) -> int:
 
 def cmd_tags(args: argparse.Namespace) -> int:
     counts = store.tag_counts(
-        since=_parse_when(args.since) if args.since else None,
-        until=_parse_when(args.until) if args.until else None,
+        since=_parse_since(args.since) if args.since else None,
+        until=_parse_until(args.until) if args.until else None,
     )
     ordered = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
     if args.json:
@@ -359,9 +356,15 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    if args.command is None:
-        return cmd_write(args)
-    return args.func(args)
+    try:
+        if args.command is None:
+            return cmd_write(args)
+        return args.func(args)
+    except ValueError as exc:
+        # Covers unparseable dates from .dates (bad ISO and bad natural language both land
+        # here), plus any other plain input-validation failure a command didn't already handle.
+        print(f"journal: {exc}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

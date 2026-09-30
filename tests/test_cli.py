@@ -5,6 +5,28 @@ import pytest
 from journal.cli import main
 
 
+def test_new_accepts_natural_language_at(capsys):
+    assert main(["new", "--at", "yesterday", "--text", "backfilled", "--json"]) == 0
+    created = json.loads(capsys.readouterr().out)
+    assert created["created"]  # parsed to *some* valid ISO timestamp, not rejected
+
+
+def test_list_since_accepts_natural_language(capsys):
+    main(["new", "--text", "today's entry"])
+    capsys.readouterr()
+
+    assert main(["list", "--since", "today"]) == 0
+    out = capsys.readouterr().out
+    assert "[cli]" in out
+
+
+def test_bad_date_returns_clean_error_not_traceback(capsys):
+    rc = main(["list", "--since", "not a real date, sorry"])
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "could not parse" in err
+
+
 def test_new_and_show_json(capsys):
     assert main(["new", "--text", "hello #test", "--json"]) == 0
     created = json.loads(capsys.readouterr().out)
