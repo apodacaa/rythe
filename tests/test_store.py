@@ -17,7 +17,7 @@ def dt_on(year, month, day, h=12):
 
 def test_create_writes_file_at_year_month_path(journal_dir):
     entry = store.create(created=dt(16, 46, 8), body="hello #work")
-    path = journal_dir / "entries" / "2026" / "09" / f"{entry.id}.md"
+    path = journal_dir / "entries" / "2026" / "09" / f"{entry.id}.txt"
     assert path.exists()
 
 

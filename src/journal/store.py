@@ -40,7 +40,7 @@ def audio_root() -> Path:
 
 def _entry_path(entry_id: str) -> Path:
     year, month = entry_id[:4], entry_id[5:7]
-    return entries_root() / year / month / f"{entry_id}.md"
+    return entries_root() / year / month / f"{entry_id}.txt"
 
 
 def _find_path(entry_id: str) -> Path | None:
@@ -50,7 +50,7 @@ def _find_path(entry_id: str) -> Path | None:
     # Fallback scan, in case an id ever doesn't encode its own year/month (e.g. imported data).
     root = entries_root()
     if root.exists():
-        for candidate in root.rglob(f"{entry_id}.md"):
+        for candidate in root.rglob(f"{entry_id}.txt"):
             return candidate
     return None
 
@@ -69,7 +69,7 @@ def iter_entries():
     root = entries_root()
     if not root.exists():
         return
-    for path in sorted(root.rglob("*.md")):
+    for path in sorted(root.rglob("*.txt")):
         yield Entry.from_markdown(path.stem, path.read_text())
 
 
@@ -168,7 +168,7 @@ def delete(entry_id: str) -> Path:
     stamp = datetime.now().strftime("%Y%m%dT%H%M%S")
     trash_entries = trash_root() / "entries"
     trash_entries.mkdir(parents=True, exist_ok=True)
-    dest = trash_entries / f"{entry_id}.{stamp}.md"
+    dest = trash_entries / f"{entry_id}.{stamp}.txt"
     path.rename(dest)
 
     if entry.audio:

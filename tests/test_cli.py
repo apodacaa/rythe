@@ -124,6 +124,45 @@ def test_new_editor_composes_entry_from_editor_content(capsys, monkeypatch, jour
     assert entry["tags"] == ["composed"]
 
 
+def test_new_editor_seeds_tmpfile_with_frontmatter_before_editing(capsys, monkeypatch, journal_dir):
+    seen = {}
+
+    def fake_editor(path):
+        seen["seeded"] = Path(path).read_text()
+        with open(path, "a") as f:
+            f.write("typed after the frontmatter #seeded\n")
+        return 0
+
+    monkeypatch.setattr("journal.cli.subprocess.call", lambda command: fake_editor(command[-1]))
+
+    assert main(["new", "--editor", "--json"]) == 0
+    entry = json.loads(capsys.readouterr().out)
+
+    assert seen["seeded"].startswith("---\ncreated: ")
+    assert "\nsource: cli\n---\n" in seen["seeded"]
+    assert entry["body"].strip() == "typed after the frontmatter #seeded"
+    assert entry["tags"] == ["seeded"]
+    assert entry["created"]  # the id/created shown in the editor matches what got saved
+    assert entry["id"].startswith(entry["created"][:4])
+
+
+def test_new_editor_mangled_frontmatter_falls_back_to_whole_buffer_as_body(
+    capsys, monkeypatch, journal_dir
+):
+    def fake_editor(path):
+        # user deleted the seeded frontmatter entirely and just wrote prose
+        with open(path, "w") as f:
+            f.write("no frontmatter left at all #stillworks\n")
+        return 0
+
+    monkeypatch.setattr("journal.cli.subprocess.call", lambda command: fake_editor(command[-1]))
+
+    assert main(["new", "--editor", "--json"]) == 0
+    entry = json.loads(capsys.readouterr().out)
+    assert entry["body"].strip() == "no frontmatter left at all #stillworks"
+    assert entry["tags"] == ["stillworks"]
+
+
 def test_new_editor_passes_a_markdown_tmpfile_to_editor_command(capsys, monkeypatch, journal_dir):
     calls = []
 
@@ -137,7 +176,7 @@ def test_new_editor_passes_a_markdown_tmpfile_to_editor_command(capsys, monkeypa
 
     assert main(["new", "--editor"]) == 0
     assert calls[0][:2] == ["nvim", "--clean"]
-    assert calls[0][-1].endswith(".md")
+    assert calls[0][-1].endswith(".txt")
 
 
 def test_new_editor_empty_file_aborts_without_creating_entry(capsys, monkeypatch, journal_dir):
@@ -429,7 +468,7 @@ def test_edit_invokes_editor_appends_content_and_sets_updated(monkeypatch, capsy
     assert len(calls) == 1
     command = calls[0]
     assert command[:2] == ["nvim", "--clean"]
-    assert command[-1].endswith(f"{entry_id}.md")
+    assert command[-1].endswith(f"{entry_id}.txt")
 
     main(["show", entry_id, "--json"])
     shown = json.loads(capsys.readouterr().out)
