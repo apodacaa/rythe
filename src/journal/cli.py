@@ -1,8 +1,5 @@
 """journal — a date/time-based personal journal.
 
-The CLI is a plain data tool for Claude: create, list, show, search and tag entries. It never
-calls Claude or any API itself.
-
 Examples:
   journal new --text "Had a good day #gratitude"
   journal new --editor                        # compose in $EDITOR instead
