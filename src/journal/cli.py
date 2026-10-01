@@ -85,24 +85,15 @@ def _preview(entry: Entry, length: int = 50) -> str:
 
 
 def cmd_new(args: argparse.Namespace) -> int:
-    created = _parse_when(args.at) if args.at else _now()
     if args.editor:
-        seed = Entry(id="", created=created, source=args.source, title=args.title or "", body="")
         fd, tmp_name = tempfile.mkstemp(suffix=".txt", prefix="journal-new-")
         os.close(fd)
         tmp_path = Path(tmp_name)
         try:
-            tmp_path.write_text(seed.to_markdown())
             subprocess.call(_editor_command() + [str(tmp_path)])
-            full_text = tmp_path.read_text()
+            body = tmp_path.read_text()
         finally:
             tmp_path.unlink(missing_ok=True)
-        try:
-            body = Entry.from_markdown("draft", full_text).body
-        except ValueError:
-            # frontmatter got edited away or mangled; fall back to treating
-            # the whole buffer as body rather than losing what was written
-            body = full_text
         if not body.strip():
             print("journal: no entry created (empty)", file=sys.stderr)
             return 1
@@ -112,6 +103,7 @@ def cmd_new(args: argparse.Namespace) -> int:
         body = sys.stdin.read()
     else:
         body = args.text
+    created = _parse_when(args.at) if args.at else _now()
     entry = store.create(created=created, body=body, source=args.source, title=args.title or "")
     if args.json:
         print(json.dumps(_entry_to_dict(entry), indent=2))
