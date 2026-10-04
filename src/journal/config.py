@@ -40,12 +40,18 @@ class StorageConfig:
 
 
 @dataclass
+class AppearanceConfig:
+    color: str = "auto"  # auto | always | never
+
+
+@dataclass
 class Config:
     transcribe: TranscribeConfig = field(default_factory=TranscribeConfig)
     memo: MemoConfig = field(default_factory=MemoConfig)
     history: HistoryConfig = field(default_factory=HistoryConfig)
     resurface: ResurfaceConfig = field(default_factory=ResurfaceConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
+    appearance: AppearanceConfig = field(default_factory=AppearanceConfig)
     prompts: dict[str, list[str]] = field(default_factory=dict)
 
 
@@ -79,6 +85,7 @@ def load_config() -> Config:
         history=HistoryConfig(**_known(HistoryConfig, raw.get("history", {}))),
         resurface=ResurfaceConfig(**_known(ResurfaceConfig, raw.get("resurface", {}))),
         storage=StorageConfig(**_known(StorageConfig, raw.get("storage", {}))),
+        appearance=AppearanceConfig(**_known(AppearanceConfig, raw.get("appearance", {}))),
         prompts={name: list(items) for name, items in raw.get("prompts", {}).items()},
     )
 

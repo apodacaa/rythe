@@ -53,7 +53,7 @@ import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import configcmd, docs, ingest, prompts, render, setup, store, transcribe
+from . import configcmd, docs, ingest, prompts, render, setup, store, transcribe, ui
 from .config import config_path, load_config
 from .dates import (
     parse_date as _parse_date,
@@ -1003,6 +1003,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
+        ui.configure(load_config().appearance.color)
         if args.command is None:
             return cmd_write(args)
         return args.func(args)
