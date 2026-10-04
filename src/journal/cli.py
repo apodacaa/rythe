@@ -6,6 +6,8 @@ Examples:
   echo "typed from a script" | journal new --source cli
   journal list --since 2026-09-01 --tag work
   journal list --since yesterday              # natural language works too; ISO is preferred
+  journal read                                # the last 7 days, as prose, oldest first
+  journal read --since 2026-09-01 --tag work  # any range or filter; pages through $PAGER
   journal show 2026-09-30T164608
   journal search "coffee" --tag morning
   journal search --tag work                  # tag filter alone, no text query
@@ -36,10 +38,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import ingest, store, transcribe
+from . import ingest, render, store, transcribe
 from .dates import (
     parse_date as _parse_date,
     parse_datetime as _parse_when,
@@ -160,8 +162,50 @@ def cmd_show(args: argparse.Namespace) -> int:
         return 2
     if args.json:
         print(json.dumps(_entry_to_dict(entry), indent=2))
-    else:
+    elif args.raw:
         print(entry.to_markdown())
+    else:
+        _output(render.render_entry(entry, show_id=True), no_pager=args.no_pager)
+    return 0
+
+
+def _output(text: str, *, no_pager: bool = False) -> None:
+    """Print `text`, through $PAGER (else `less -R`) when stdout is a terminal. Falls back to a
+    plain print when there's no pager available, so this works on any OS.
+    """
+    if no_pager or not sys.stdout.isatty():
+        print(text, end="" if text.endswith("\n") else "\n")
+        return
+    pager = shlex.split(os.environ["PAGER"]) if os.environ.get("PAGER") else None
+    if pager is None and shutil.which("less"):
+        pager = ["less", "-R"]
+    if pager is None:
+        print(text, end="" if text.endswith("\n") else "\n")
+        return
+    try:
+        subprocess.run(pager, input=text, text=True)
+    except OSError:
+        print(text, end="" if text.endswith("\n") else "\n")
+
+
+def cmd_read(args: argparse.Namespace) -> int:
+    has_range = args.since or args.until or args.on
+    since = _parse_since(args.since) if args.since else None
+    if since is None and not has_range:
+        since = _parse_since((_now() - timedelta(days=6)).date().isoformat())
+    entries = store.list_entries(
+        since=since,
+        until=_parse_until(args.until) if args.until else None,
+        on=_parse_date(args.on) if args.on else None,
+        tags=[normalize_tag(t) for t in args.tag] if args.tag else None,
+        exclude_tags=[normalize_tag(t) for t in args.exclude_tag] if args.exclude_tag else None,
+        source=args.source,
+    )
+    if not entries:
+        print("nothing written in that period")
+        return 0
+    entries.reverse()  # list_entries is newest-first; reading order is oldest-first
+    _output(render.render_entries(entries, show_id=args.ids), no_pager=args.no_pager)
     return 0
 
 
@@ -443,9 +487,24 @@ def build_parser() -> argparse.ArgumentParser:
     p_list.add_argument("--json", action="store_true")
     p_list.set_defaults(func=cmd_list)
 
+    p_read = sub.add_parser(
+        "read", help="read entries as prose, oldest first (default: the last 7 days)"
+    )
+    p_read.add_argument("--since", metavar="ISO")
+    p_read.add_argument("--until", metavar="ISO")
+    p_read.add_argument("--on", metavar="YYYY-MM-DD", help="entries created on this exact date")
+    p_read.add_argument("--tag", action="append", help="repeatable; entry must have all given tags")
+    p_read.add_argument("--exclude-tag", action="append", help="repeatable; entry must have none of these tags")
+    p_read.add_argument("--source", choices=["cli", "memo", "text"])
+    p_read.add_argument("--ids", action="store_true", help="show each entry's id (for edit/tag/delete)")
+    p_read.add_argument("--no-pager", action="store_true")
+    p_read.set_defaults(func=cmd_read)
+
     p_show = sub.add_parser("show", help="print a full entry")
     p_show.add_argument("id")
     p_show.add_argument("--json", action="store_true")
+    p_show.add_argument("--raw", action="store_true", help="print the file as stored, frontmatter included")
+    p_show.add_argument("--no-pager", action="store_true")
     p_show.set_defaults(func=cmd_show)
 
     p_search = sub.add_parser("search", help="search entry bodies, line by line")
