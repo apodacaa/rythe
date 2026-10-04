@@ -103,6 +103,8 @@ COMMANDS = [
     ["prompts", "list"],
     ["prompts", "show", "hard"],
     ["setup", "--check"],
+    ["show", "last", "--no-pager"],
+    ["read", "--since", "2020-01-01", "--no-pager"],
 ]
 
 
@@ -139,3 +141,12 @@ def test_no_color_env_and_never_setting_both_keep_output_plain(argv, seeded, cap
     capsys.readouterr()
     main(argv)
     assert "\x1b" not in capsys.readouterr().out
+
+
+def test_reading_views_highlight_tags_and_labels(seeded, capsys, monkeypatch):
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    main(["read", "--since", "2020-01-01", "--no-pager"])
+    out = capsys.readouterr().out
+    assert ui.style("#work", "cyan") in out and ui.style("#home", "cyan") in out
+    assert ui.style("voice memo", "magenta") in out
+    assert ui.style("9:00 AM", "bold") in out

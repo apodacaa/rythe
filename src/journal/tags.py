@@ -13,6 +13,9 @@ import re
 _TAG_RE = re.compile(r"(?<![\w#/])#([A-Za-z][\w-]*)")
 
 
+TAG_RE = _TAG_RE  # public alias, for code that highlights tags in place
+
+
 def extract_tags(body: str) -> list[str]:
     seen: list[str] = []
     for match in _TAG_RE.finditer(body):

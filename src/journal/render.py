@@ -9,6 +9,7 @@ import re
 
 from . import ui
 from .entry import Entry
+from .tags import TAG_RE
 
 _SOURCE_LABELS = {"memo": "voice memo", "text": "imported"}
 _RULE_WIDTH = 60
@@ -16,24 +17,33 @@ _RULE_WIDTH = 60
 
 def day_header(entry: Entry) -> str:
     label = f"{entry.created:%A, %B} {entry.created.day}, {entry.created.year}"
-    return f"── {label} ".ljust(_RULE_WIDTH, "─")
+    head = f"── {label} "
+    return ui.style(head, "bold", "cyan") + ui.style("─" * max(0, _RULE_WIDTH - len(head)), "gray")
 
 
 def entry_header(entry: Entry, *, show_id: bool = False) -> str:
     hour = entry.created.hour % 12 or 12
-    parts = [f"{hour}:{entry.created:%M %p}"]
+    parts = [ui.style(f"{hour}:{entry.created:%M %p}", "bold")]
     label = _SOURCE_LABELS.get(entry.source)
     if label:
-        parts.append(label)
+        parts.append(ui.style(label, "magenta"))
     if entry.title:
-        parts.append(f"“{entry.title}”")
+        parts.append(ui.style(f"“{entry.title}”", "italic"))
     if show_id:
-        parts.append(entry.id)
-    return " · ".join(parts)
+        parts.append(ui.style(entry.id, "dim"))
+    return ui.style(" · ", "gray").join(parts)
+
+
+def _body(entry: Entry) -> str:
+    """The entry text, with #tags picked out in cyan (plain text is unchanged without color)."""
+    body = entry.body.rstrip()
+    if not ui.color():
+        return body
+    return TAG_RE.sub(lambda m: ui.style(m.group(0), "cyan"), body)
 
 
 def render_entry(entry: Entry, *, show_id: bool = False) -> str:
-    return f"{entry_header(entry, show_id=show_id)}\n{entry.body.rstrip()}\n"
+    return f"{entry_header(entry, show_id=show_id)}\n{_body(entry)}\n"
 
 
 def render_entries(entries: list[Entry], *, show_id: bool = False) -> str:
