@@ -34,12 +34,11 @@ Examples:
 With no subcommand (or `journal write`), opens $EDITOR on a new entry — same as `journal new
 --editor`.
 
-Config (optional, ~/.config/journal/config.toml):
-  [history]   enabled = false        # stop auto-committing each write to git in the data dir
-  [resurface] enabled = false        # stop showing an older entry after you save a new one
-  [prompts]   mine = ["question?"]   # your own sets for `--prompt mine`
-  [transcribe] model, language       # whisper.cpp settings for `ingest audio`
-  [memo]      subject_prefix         # subject prefix the journal-sweep skill looks for
+Settings and docs (both explain themselves; `journal docs --all` prints everything):
+  journal config list                         # every setting: value, default, source
+  journal config set history.enabled false    # change one (validated); `config explain` says what each does
+  journal prompts list                        # the writing prompt sets and what each is for
+  journal docs                                # the built-in guide; `docs --list` for topics
 """
 from __future__ import annotations
 
@@ -54,7 +53,7 @@ import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import ingest, prompts, render, store, transcribe
+from . import configcmd, docs, ingest, prompts, render, store, transcribe
 from .config import load_config
 from .dates import (
     parse_date as _parse_date,
@@ -647,6 +646,30 @@ def cmd_write(args: argparse.Namespace) -> int:
     return main(["new", "--editor"] + (["--prompt", prompt] if prompt else []))
 
 
+# Help for flags that appear on many commands, applied to any flag defined without its own help
+# text, so `--help` and the generated `journal docs commands` never show a bare flag.
+_DEFAULT_FLAG_HELP = {
+    "json": "print machine-readable JSON (stable shape; see `journal docs json`)",
+    "since": "only entries on or after this ISO date or timestamp (a bare date means the start of that day)",
+    "until": "only entries on or before this ISO date or timestamp (a bare date includes that whole day)",
+    "title": "optional title, shown in listings and when reading",
+    "source": "only/for this source: cli (typed), memo (voice memo), text (imported)",
+    "limit": "show at most this many entries",
+    "tag": "repeatable; entry must have all given tags",
+    "regex": "treat the query as a regular expression",
+    "no_pager": "print directly instead of through $PAGER",
+}
+
+
+def _fill_flag_help(parser: argparse.ArgumentParser) -> None:
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            for child in action.choices.values():
+                _fill_flag_help(child)
+        elif action.help is None and action.dest in _DEFAULT_FLAG_HELP:
+            action.help = _DEFAULT_FLAG_HELP[action.dest]
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="journal",
@@ -780,6 +803,70 @@ def build_parser() -> argparse.ArgumentParser:
     p_review.add_argument("--no-pager", action="store_true")
     p_review.set_defaults(func=cmd_review)
 
+    p_config = sub.add_parser(
+        "config",
+        help="see, explain and change settings (list, get, set, unset, explain, path)",
+        description="Inspect and change the config file safely. `journal docs config` documents every setting.",
+    )
+    config_sub = p_config.add_subparsers(dest="config_command", required=True)
+
+    p_cfg_list = config_sub.add_parser("list", help="every setting with its value, default and source")
+    p_cfg_list.add_argument("--json", action="store_true")
+    p_cfg_list.set_defaults(func=configcmd.cmd_config_list)
+
+    p_cfg_get = config_sub.add_parser("get", help="print one setting's value")
+    p_cfg_get.add_argument("key", help="e.g. history.enabled")
+    p_cfg_get.add_argument("--json", action="store_true")
+    p_cfg_get.set_defaults(func=configcmd.cmd_config_get)
+
+    p_cfg_set = config_sub.add_parser(
+        "set",
+        help="change a setting (validated)",
+        description=(
+            "Set a setting. Booleans take true/false; transcribe.model must be a known model; "
+            "prompts.<name> takes one or more prompts, e.g. "
+            "`journal config set prompts.gratitude \"What am I grateful for?\" \"Who helped me?\"`. "
+            "The file is rewritten; hand-written comments are saved to config.toml.bak first."
+        ),
+    )
+    p_cfg_set.add_argument("key", help="e.g. history.enabled")
+    p_cfg_set.add_argument("values", nargs="+", help="the new value (several for prompts.<name>)")
+    p_cfg_set.add_argument("--json", action="store_true")
+    p_cfg_set.set_defaults(func=configcmd.cmd_config_set)
+
+    p_cfg_unset = config_sub.add_parser("unset", help="remove a setting, going back to its default")
+    p_cfg_unset.add_argument("key")
+    p_cfg_unset.set_defaults(func=configcmd.cmd_config_unset)
+
+    p_cfg_explain = config_sub.add_parser("explain", help="say what a setting does (all of them if no key)")
+    p_cfg_explain.add_argument("key", nargs="?")
+    p_cfg_explain.add_argument("--json", action="store_true")
+    p_cfg_explain.set_defaults(func=configcmd.cmd_config_explain)
+
+    p_cfg_path = config_sub.add_parser("path", help="print the config file's location")
+    p_cfg_path.set_defaults(func=configcmd.cmd_config_path)
+
+    p_prompts = sub.add_parser("prompts", help="list and show writing prompt sets (today, hard, distance, …)")
+    prompts_sub = p_prompts.add_subparsers(dest="prompts_command", required=True)
+    p_pr_list = prompts_sub.add_parser("list", help="every prompt set, where it comes from, and what it is for")
+    p_pr_list.add_argument("--json", action="store_true")
+    p_pr_list.set_defaults(func=configcmd.cmd_prompts_list)
+    p_pr_show = prompts_sub.add_parser("show", help="print one set's prompts")
+    p_pr_show.add_argument("name")
+    p_pr_show.add_argument("--json", action="store_true")
+    p_pr_show.set_defaults(func=configcmd.cmd_prompts_show)
+
+    p_docs = sub.add_parser(
+        "docs",
+        help="the built-in guide: concepts, commands, config, prompts, JSON, agent notes",
+        description="Print the built-in documentation as markdown. No topic prints the overview.",
+    )
+    p_docs.add_argument("topic", nargs="?", help="see --list")
+    p_docs.add_argument("--list", action="store_true", help="list the topics")
+    p_docs.add_argument("--all", action="store_true", help="print every topic")
+    p_docs.add_argument("--json", action="store_true")
+    p_docs.set_defaults(func=docs.cmd_docs)
+
     p_tags = sub.add_parser("tags", help="tag counts across entries")
     p_tags.add_argument("--since", metavar="ISO")
     p_tags.add_argument("--until", metavar="ISO")
@@ -867,6 +954,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_write.set_defaults(func=cmd_write)
 
+    _fill_flag_help(parser)
     return parser
 
 

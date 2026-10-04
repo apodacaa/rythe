@@ -631,7 +631,7 @@ def test_help_documents_new_behaviour(capsys):
             main([*argv, "--help"])
         return " ".join(capsys.readouterr().out.split())
 
-    assert "[history]" in help_of() and "[prompts]" in help_of()
+    assert "journal config list" in help_of() and "journal docs" in help_of()
     assert "frontmatter" in help_of("edit") and "fzf" in help_of("edit")
     assert "--raw" in help_of("show") or "raw" in help_of("show")
     assert "on_this_day_count" in help_of("status")

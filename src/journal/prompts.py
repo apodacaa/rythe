@@ -37,6 +37,41 @@ BUILTIN: dict[str, list[str]] = {
 }
 
 
+# What each built-in set is for, shown by `journal prompts list` and `journal docs prompts`.
+DESCRIPTIONS: dict[str, str] = {
+    "today": (
+        "A light daily prompt (the default for --prompt): what stood out, a small win, a moment "
+        "worth remembering. Based on diary research (Amabile's progress principle) showing that "
+        "noting one small event a day makes the days easy to look back on."
+    ),
+    "hard": (
+        "Expressive writing about something stressful or unresolved (Pennebaker). Research finds "
+        "it helps most when written privately, for about 15 minutes, about recent events, ideally "
+        "over several days. It isn't a substitute for support if it stirs up more than you want "
+        "to handle alone."
+    ),
+    "distance": (
+        "Self-distancing (Kross): write about a problem as an outside observer, using your own "
+        "name or \"you\" instead of \"I\". It reduces how strongly you react and helps you reason "
+        "about the problem. Skip it when you're feeling very low: one study found it can worsen "
+        "mood for people at high risk of depression."
+    ),
+    "review": (
+        "Used by `journal review`: reflection questions for looking back over a stretch of "
+        "entries (where your energy went, small progress, what's unresolved, what looks "
+        "different now)."
+    ),
+}
+
+
+def source_of(name: str, extra: dict[str, list[str]] | None = None) -> str:
+    """"built-in", "config" (your own set) or "config (replaces built-in)"."""
+    in_config = name in (extra or {})
+    if name in BUILTIN:
+        return "config (replaces built-in)" if in_config else "built-in"
+    return "config"
+
+
 def available(extra: dict[str, list[str]] | None = None) -> dict[str, list[str]]:
     return {**BUILTIN, **(extra or {})}
 
