@@ -127,6 +127,11 @@ def iter_entries():
         yield Entry.from_markdown(path.stem, path.read_text())
 
 
+def count_entries() -> int:
+    root = entries_root()
+    return sum(1 for _ in root.rglob("*.txt")) if root.exists() else 0
+
+
 def find_by_message_id(message_id: str) -> Entry | None:
     for entry in iter_entries():
         if entry.message_id == message_id:
