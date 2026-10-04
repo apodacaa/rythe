@@ -663,7 +663,9 @@ def cmd_model_list(args: argparse.Namespace) -> int:
     else:
         for m in models:
             mark = "x" if m["downloaded"] else " "
-            print(f"[{mark}] {m['name']:8} {m['file']}  {transcribe.format_size(m['name'])}")
+            rec = " (recommended)" if m["name"] == transcribe.RECOMMENDED_MODEL else ""
+            print(f"[{mark}] {m['name']:8} {transcribe.format_size(m['name']):<8} {m['note']}{rec}")
+        print("[x] = already downloaded. Fetch one with `journal model download <name>`.")
     return 0
 
 

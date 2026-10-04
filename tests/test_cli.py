@@ -81,6 +81,13 @@ def test_model_list_shows_all_known_models(capsys, journal_dir):
     models = json.loads(capsys.readouterr().out)
     assert {m["name"] for m in models} == set(transcribe.KNOWN_MODELS)
     assert all(m["downloaded"] is False for m in models)
+    assert all(m["note"] and m["approx_mb"] for m in models)
+
+
+def test_model_list_plain_explains_models_and_marks_the_recommended_one(capsys, journal_dir):
+    assert main(["model", "list"]) == 0
+    out = capsys.readouterr().out
+    assert "(recommended)" in out and "fastest and roughest" in out and "already downloaded" in out
 
 
 def test_model_download_writes_file(capsys, journal_dir, monkeypatch):

@@ -284,3 +284,32 @@ def test_docs_describe_setup_for_people_and_agents():
     json_doc = docs.render_topic("json")
     for key in setup.environment_report():
         assert f'"{key}"' in json_doc, key
+
+
+def test_every_whisper_model_has_a_plain_language_note():
+    from journal import transcribe
+
+    assert set(transcribe.MODEL_NOTES) == set(transcribe.KNOWN_MODELS)
+    assert transcribe.RECOMMENDED_MODEL in transcribe.KNOWN_MODELS
+
+
+def test_model_list_in_the_wizard_explains_each_model_and_marks_downloaded(home):
+    from journal import transcribe
+
+    present = home / ".local" / "share" / "journal" / "models" / "ggml-base.bin"
+    present.parent.mkdir(parents=True)
+    present.write_bytes(b"x")
+
+    s = Session("", "", "", "y", "", "", "n", "")
+    s.run(download=_downloads()[1])
+    for name, note in transcribe.MODEL_NOTES.items():
+        assert note in s.text, name
+    assert "[recommended]" in s.text and "[downloaded]" in s.text
+    line = next(t for t in s.said if t.strip().startswith("base"))
+    assert "[downloaded]" in line
+
+
+def test_declining_a_download_says_how_to_do_it_later(home):
+    s = Session("", "", "", "y", "medium", "", "n", "")
+    s.run(download=_downloads()[1])
+    assert "journal model download medium" in s.text
