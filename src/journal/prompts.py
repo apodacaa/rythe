@@ -64,6 +64,15 @@ DESCRIPTIONS: dict[str, str] = {
 }
 
 
+# One-line versions of DESCRIPTIONS, for compact listings such as the setup wizard.
+SUMMARIES: dict[str, str] = {
+    "today": "a light daily question (the default)",
+    "hard": "expressive writing about something heavy",
+    "distance": "write about a problem as an outside observer",
+    "review": "the questions `journal review` opens with",
+}
+
+
 def source_of(name: str, extra: dict[str, list[str]] | None = None) -> str:
     """"built-in", "config" (your own set) or "config (replaces built-in)"."""
     in_config = name in (extra or {})

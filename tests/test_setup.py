@@ -1,6 +1,10 @@
 import json
+from pathlib import Path
 
-from journal import setup
+import pytest
+
+from journal import setup, settings
+from journal.config import config_path, load_raw
 from journal.cli import main
 
 
@@ -51,7 +55,125 @@ def test_plain_check_output(capsys, monkeypatch):
     assert "journal folder:" in out and "not created yet" in out
 
 
+class Session:
+    """Scripted stand-in for a terminal: answers are consumed in order; running out acts like
+    EOF (Ctrl-D), which the wizard must treat as a cancel."""
+
+    def __init__(self, *answers):
+        self.answers = list(answers)
+        self.prompts = []
+        self.said = []
+
+    def ask(self, prompt):
+        self.prompts.append(prompt)
+        if not self.answers:
+            raise EOFError
+        return self.answers.pop(0)
+
+    def say(self, text):
+        self.said.append(text)
+
+    @property
+    def text(self):
+        return "\n".join(self.prompts + self.said)
+
+    def run(self, **kw):
+        return setup.run_wizard(self.ask, self.say, **kw)
+
+
+@pytest.fixture
+def home(tmp_path, monkeypatch):
+    """A fake HOME with no JOURNAL_DIR, so the default data dir is inside tmp_path."""
+    monkeypatch.delenv("JOURNAL_DIR")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr("journal.setup.shutil.which", lambda name: f"/usr/bin/{name}")
+    return tmp_path
+
+
+def test_accepting_every_default_changes_nothing(home):
+    s = Session("", "", "", "")  # keep folder, history, resurface, no first entry
+    assert s.run(start_entry=lambda: 0) == 0
+    assert not config_path().exists()
+    assert "Nothing to change" in s.text and "journal docs" in s.text
+
+
+def test_changing_one_answer_writes_only_that_key(home):
+    s = Session("", "n", "", "y", "")  # history off, then save
+    assert s.run() == 0
+    assert load_raw() == {"history": {"enabled": False}}
+    assert "history.enabled: true -> false" in s.text
+
+
+def test_bad_folder_is_asked_again_then_saved_with_move_hint(home):
+    old = home / ".local" / "share" / "journal" / "entries" / "2026" / "01"
+    old.mkdir(parents=True)
+    (old / "2026-01-01T080000.txt").write_text("---\ncreated: 2026-01-01T08:00:00+00:00\n---\nhi\n")
+    new = home / "Documents" / "journal"
+
+    s = Session("n", "relative/path", str(new), "", "", "y", "")
+    assert s.run() == 0
+    assert "must be an absolute path" in s.text
+    assert load_raw() == {"storage": {"dir": str(new)}}
+    assert "(1 entries)" in s.text
+    assert f"mv {home}/.local/share/journal {new}" in s.text  # existing entries are not moved for you
+
+
+def test_journal_dir_env_skips_the_folder_question(tmp_path, monkeypatch):
+    monkeypatch.setattr("journal.setup.shutil.which", lambda name: f"/usr/bin/{name}")
+    s = Session("", "", "")  # history, resurface, first entry (conftest sets JOURNAL_DIR)
+    assert s.run(start_entry=lambda: 0) == 0
+    assert "overrides the storage.dir setting" in s.text
+    assert not any("Keep it here" in p for p in s.prompts)
+
+
+def test_missing_git_skips_the_history_question(home, monkeypatch):
+    monkeypatch.setattr("journal.setup.shutil.which", lambda name: None if name == "git" else f"/usr/bin/{name}")
+    s = Session("", "", "")  # folder, resurface, first entry
+    assert s.run(start_entry=lambda: 0) == 0
+    assert "git isn't installed" in s.text and not any("local history" in p for p in s.prompts)
+
+
+def test_cancelling_before_the_summary_changes_nothing(home):
+    s = Session("", "n")  # then EOF
+    assert s.run() == 130
+    assert "Nothing was changed" in s.text and not config_path().exists()
+
+
+def test_declining_the_final_save_writes_nothing(home):
+    s = Session("", "n", "", "n", "")
+    assert s.run() == 0
+    assert "Nothing was saved" in s.text and not config_path().exists()
+
+
+def test_rerun_shows_current_values_as_the_defaults(home):
+    main(["config", "set", "history.enabled", "false"])
+    s = Session("", "", "", "")
+    s.run()
+    assert any("Keep a local history? [y/N]" in p for p in s.prompts)
+    assert load_raw() == {"history": {"enabled": False}}  # unchanged by accepting defaults
+
+
+def test_first_entry_is_offered_and_started_on_yes(home):
+    started = []
+    Session("", "", "", "y").run(start_entry=lambda: started.append(1) or 0)
+    assert started == [1]
+    started.clear()
+    Session("", "", "", "n").run(start_entry=lambda: started.append(1) or 0)
+    assert started == []
+
+
+def test_every_key_the_wizard_asks_about_is_in_the_registry():
+    for key in setup.WIZARD_KEYS:
+        assert settings.lookup(key) is not None, key
+
+
 def test_setup_without_a_terminal_refuses_and_points_to_alternatives(capsys):
     code, _, err = run(capsys, "setup")  # pytest's stdin/stdout are not terminals
     assert code == 1 and "needs a terminal" in err and "config set" in err
     assert run(capsys, "setup", "--json")[0] == 1
+
+
+def test_every_builtin_prompt_set_has_a_one_line_summary():
+    from journal import prompts
+
+    assert set(prompts.BUILTIN) == set(prompts.SUMMARIES)

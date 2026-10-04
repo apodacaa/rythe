@@ -476,8 +476,7 @@ def cmd_setup(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 1
-    print(setup.render_report(setup.environment_report()))
-    return 0
+    return setup.run_wizard(start_entry=lambda: cmd_write(argparse.Namespace()))
 
 
 def cmd_tags(args: argparse.Namespace) -> int:
