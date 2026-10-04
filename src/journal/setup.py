@@ -11,7 +11,7 @@ import shutil
 from pathlib import Path
 from typing import Callable
 
-from . import prompts, settings, store, transcribe
+from . import prompts, settings, store, transcribe, ui
 from .config import config_path, load_config, load_raw, write_raw
 from .configcmd import _fmt
 
@@ -119,6 +119,9 @@ def render_report(report: dict) -> str:
     return "\n".join(lines)
 
 
+TOTAL_STEPS = 5  # folder, history, resurfacing, voice memos, prompts
+
+
 class _Wizard:
     """One run of the wizard: gathers answers as pending changes, then saves once at the end."""
 
@@ -131,17 +134,29 @@ class _Wizard:
         self.download: str | None = None  # a whisper model to fetch after saving
 
     # -- small helpers --------------------------------------------------------------------
+    def _q(self, question: str, suffix: str) -> str:
+        """A styled input() prompt: a magenta marker, the question in bold, the options in cyan."""
+        mark = ui.style(ui.glyph("ask"), "bold", "magenta")
+        text = f" {mark} {ui.style(question, 'bold')} {ui.style(suffix, 'cyan')} "
+        return ui.readline_safe(text)
+
+    def heading(self, number: int, title: str) -> None:
+        self.say("\n" + ui.step(number, TOTAL_STEPS, title))
+
+    def info(self, *lines: str) -> None:
+        self.say(ui.gutter(list(lines)))
+
     def yes_no(self, question: str, default: bool) -> bool:
         suffix = "[Y/n]" if default else "[y/N]"
         while True:
-            answer = self.ask(f"{question} {suffix} ").strip().lower()
+            answer = self.ask(self._q(question, suffix)).strip().lower()
             if not answer:
                 return default
             if answer in ("y", "yes"):
                 return True
             if answer in ("n", "no"):
                 return False
-            self.say("  Please answer y or n.")
+            self.say(ui.warn("Please answer y or n."))
 
     def current(self, key: str):
         return settings.current(self.raw, settings.lookup(key))[0]
@@ -153,39 +168,50 @@ class _Wizard:
 
     # -- steps ----------------------------------------------------------------------------
     def welcome(self, report: dict) -> None:
-        self.say("Welcome to journal. A few quick questions; press Enter to accept the default.")
-        self.say("Nothing is saved until the end, and you can run this again any time.\n")
+        self.say(ui.banner("journal setup"))
+        self.say(ui.style(
+            " A few quick questions; press Enter to accept the default shown. Nothing is saved\n"
+            " until the end, and you can run this again any time.", "dim"))
         for c in report["checks"]:
             if not c["found"] and c["name"] in ("editor", "fzf", "pager"):
-                label = "needed" if c["name"] == "editor" else "note"
-                self.say(f"  {label}: {c['name']} not found. {c['hint']}")
+                needed = " (needed)" if c["name"] == "editor" else ""
+                self.say(" " + ui.warn(f"{c['name']} not found{needed}. {c['hint']}"))
 
     def folder(self) -> None:
         current = store.data_dir()
         count = store.count_entries()
-        self.say("\nWhere should your journal live?")
+        self.heading(1, "Where should your journal live?")
         if os.environ.get("JOURNAL_DIR"):
-            self.say(
-                f"  It's {current}. The $JOURNAL_DIR environment variable is set and overrides the "
-                "storage.dir setting, so there's nothing to choose here. Unset it to use the setting."
+            self.info(
+                f"It's {ui.style(str(current), 'bold')}.",
+                ui.style(
+                    "The $JOURNAL_DIR environment variable is set and overrides the storage.dir "
+                    "setting, so there's nothing to choose here. Unset it to use the setting.",
+                    "dim",
+                ),
             )
             return
-        self.say(
-            "  Entries are plain text files in one folder, together with audio, drafts and a git "
-            "history. A folder you already back up (a synced one, say) is a good home."
+        entries = f" ({count} {'entry' if count == 1 else 'entries'})" if count else ""
+        self.info(
+            ui.style(
+                "Entries are plain text files in one folder, together with audio, drafts and a git "
+                "history. A folder you already back up (a synced one, say) is a good home.",
+                "dim",
+            ),
+            "",
+            f"{ui.style('Right now', 'bold')}  {ui.style(str(current), 'cyan')}{entries}",
         )
-        self.say(f"  Right now: {current}" + (f" ({count} entries)" if count else ""))
         if self.yes_no("Keep it here?", True):
             return
         setting = settings.lookup("storage.dir")
         while True:
-            value = self.ask("Folder (absolute, or starting with ~; Enter to keep it): ").strip()
+            value = self.ask(self._q("Folder", "(absolute, or starting with ~; Enter to keep it)")).strip()
             if not value:
                 return
             try:
                 new = settings.coerce(setting, [value])
             except ValueError as exc:
-                self.say(f"  {exc}")
+                self.say(ui.warn(str(exc)))
                 continue
             break
         if Path(new).expanduser() != current:
@@ -194,70 +220,99 @@ class _Wizard:
                 self.moved_from = current
 
     def history(self) -> None:
-        self.say("\nKeep a history of your writing?")
+        self.heading(2, "Keep a history of your writing?")
         if shutil.which("git") is None:
-            self.say("  Every write can be saved to a local git history (never uploaded), but git isn't "
-                     "installed, so that's off for now. Install git and re-run this to turn it on.")
+            self.info(
+                ui.style(
+                    "Every write can be saved to a local git history (never uploaded), but git isn't "
+                    "installed, so that's off for now. Install git and re-run this to turn it on.",
+                    "dim",
+                )
+            )
             return
-        self.say("  Every write (new, edit, delete…) is saved to a local git history inside the "
-                 "journal folder, so a bad edit or delete can always be undone. It's never uploaded.")
+        self.info(
+            ui.style(
+                "Every write (new, edit, delete…) is saved to a local git history inside the "
+                "journal folder, so a bad edit or delete can always be undone. It's never uploaded.",
+                "dim",
+            )
+        )
         self.propose("history.enabled", self.yes_no("Keep a local history?", bool(self.current("history.enabled"))))
 
     def resurface(self) -> None:
-        self.say("\nBring up the past?")
-        self.say("  After you save an entry, journal can show one older one (the same day last year, "
-                 "else a month or a week ago). Rereading is where a journal pays off.")
+        self.heading(3, "Bring up the past?")
+        self.info(
+            ui.style(
+                "After you save an entry, journal can show one older one (the same day last year, "
+                "else a month or a week ago). Rereading is where a journal pays off.",
+                "dim",
+            )
+        )
         self.propose(
             "resurface.enabled",
             self.yes_no("Show an older entry after I save one?", bool(self.current("resurface.enabled"))),
         )
 
     def voice_memos(self) -> None:
-        self.say("\nVoice memos?")
-        self.say("  journal can turn a recording into an entry, transcribing it on this computer with "
-                 "whisper.cpp (no audio ever leaves it).")
+        self.heading(4, "Voice memos?")
+        self.info(
+            ui.style(
+                "journal can turn a recording into an entry, transcribing it on this computer with "
+                "whisper.cpp (no audio ever leaves it).",
+                "dim",
+            )
+        )
         if not self.yes_no("Will you use voice memos?", False):
             return
         for name in ("ffmpeg", "whisper-cli"):
             if shutil.which(name) is None:
                 hint = next(c["hint"] for c in environment_report()["checks"] if c["name"] == name)
-                self.say(f"  note: {name} not found. {hint}.")
-        self.say("  Pick a speech model. Bigger ones are more accurate but slower and larger to "
-                 "download. All of them understand many languages and run entirely on this computer.")
+                self.say(" " + ui.warn(f"{name} not found. {hint}."))
+        rows = [
+            ui.style(
+                "Pick a speech model. Bigger ones are more accurate but slower and larger to "
+                "download. All of them understand many languages and run entirely on this computer.",
+                "dim",
+            ),
+            "",
+        ]
         for name in transcribe.KNOWN_MODELS:
             tags = []
             if name == transcribe.RECOMMENDED_MODEL:
-                tags.append("recommended")
+                tags.append(ui.style("[recommended]", "green"))
             if self._model_file(name).exists():
-                tags.append("downloaded")
-            tag = f" [{', '.join(tags)}]" if tags else ""
-            self.say(f"    {name:<7} {transcribe.format_size(name):<8} {transcribe.MODEL_NOTES[name]}{tag}")
+                tags.append(ui.style("[downloaded]", "cyan"))
+            rows.append(
+                f"{ui.style(f'{name:<7}', 'bold')} {transcribe.format_size(name):<8} "
+                f"{ui.style(transcribe.MODEL_NOTES[name], 'dim')} {' '.join(tags)}".rstrip()
+            )
+        self.info(*rows)
         model_setting = settings.lookup("transcribe.model")
         default = self.current("transcribe.model")
         while True:
-            answer = self.ask(f"Which model? [{default}] ").strip() or default
+            answer = self.ask(self._q("Which model?", f"[{default}]")).strip() or default
             try:
                 model = settings.coerce(model_setting, [answer])
                 break
             except ValueError as exc:
-                self.say(f"  {exc}")
+                self.say(ui.warn(str(exc)))
         self.propose("transcribe.model", model)
 
         default = self.current("transcribe.language")
         while True:
-            answer = (self.ask(f"Language spoken in your memos (a code like en, de, es, or auto) [{default}] ")
+            answer = (self.ask(self._q("Language spoken in your memos?", f"(a code like en, de, es, or auto) [{default}]"))
                       .strip().lower() or default)
             if answer == "auto" or (answer.isalpha() and 2 <= len(answer) <= 3):
                 break
-            self.say("  Use a short language code such as en, de or es, or `auto` to detect it each time.")
+            self.say(ui.warn("Use a short language code such as en, de or es, or `auto` to detect it each time."))
         self.propose("transcribe.language", answer)
 
         if self._model_file(model).exists():
-            self.say(f"  The {model} model is already downloaded.")
+            self.say(" " + ui.ok(f"The {model} model is already downloaded."))
         elif self.yes_no(f"Download the {model} model now ({transcribe.format_size(model)})?", False):
             self.download = model
         else:
-            self.say(f"  OK. Voice memos won't work until it's downloaded: `journal model download {model}`.")
+            self.say(" " + ui.warn(f"Voice memos won't work until it's downloaded: `journal model download {model}`."))
 
     def _model_file(self, model: str) -> Path:
         """Where `model` will live: under the folder chosen in this run, if it changed."""
@@ -267,34 +322,47 @@ class _Wizard:
 
     def prompts_info(self) -> None:
         extra = load_config().prompts
-        self.say("\nWriting prompts (always optional; a bare `journal` is a blank page):")
+        self.heading(5, "Writing prompts")
+        rows = [ui.style("Always optional; a bare `journal` is a blank page.", "dim"), ""]
         for name in sorted(prompts.available(extra)):
-            self.say(f"  {name:<9} {prompts.SUMMARIES.get(name, 'your own set')}")
-        self.say("  Try one with `journal write --prompt hard`; `journal prompts list` says more.")
+            rows.append(f"{ui.style(f'{name:<9}', 'bold', 'cyan')} {prompts.SUMMARIES.get(name, 'your own set')}")
+        rows += ["", ui.style("Try one with `journal write --prompt hard`; `journal prompts list` says more.", "dim")]
+        self.info(*rows)
 
     def summary_and_save(self) -> bool:
         """Show the pending changes and save them if confirmed. Returns True if anything was saved."""
         if not self.changes:
-            self.say("\nNothing to change; your settings stay as they are.")
+            self.say("\n" + ui.style(" Nothing to change; your settings stay as they are.", "dim"))
             return False
-        self.say("\nHere's what will change:")
+        width = max(len(key) for key in self.changes)
+        rows = []
         for key, (old, new) in self.changes.items():
             setting = settings.lookup(key)
-            self.say(f"  {key}: {_fmt(old, setting)} -> {_fmt(new, setting)}")
+            rows.append(
+                f"{ui.style(f'{key:<{width}}', 'bold')}  {ui.style(_fmt(old, setting), 'dim')} "
+                f"{ui.style(ui.glyph('arrow'), 'magenta')} {ui.style(_fmt(new, setting), 'bold', 'green')}"
+            )
+        self.say("\n" + ui.box("Here's what will change", rows))
         if not self.yes_no("Save these?", True):
-            self.say("Nothing was saved.")
+            self.say(" " + ui.warn("Nothing was saved."))
             return False
         for key, (_, new) in self.changes.items():
             settings.set_in(self.raw, key, new)
         backup = write_raw(self.raw)
-        self.say(f"Saved to {config_path()}.")
+        self.say(" " + ui.ok(f"Saved to {config_path()}"))
         if backup:
-            self.say(f"  (Your file had comments, which rewriting drops; the old one is at {backup}.)")
+            self.say(" " + ui.warn(f"Your file had comments, which rewriting drops; the old one is at {backup}."))
         if self.moved_from is not None:
             new_dir = store.data_dir()
             self.say(
-                f"\nYour existing entries are still in {self.moved_from}. To bring them along, move "
-                f"the whole folder (history included):\n    mv {self.moved_from} {new_dir}"
+                "\n" + ui.gutter(
+                    [
+                        f"Your existing entries are still in {self.moved_from}. To bring them along,",
+                        "move the whole folder (history included):",
+                        "",
+                        f"    {ui.style(f'mv {self.moved_from} {new_dir}', 'bold')}",
+                    ]
+                )
             )
         return True
 
@@ -317,6 +385,7 @@ def run_wizard(
     """
     wiz = _Wizard(ask, say)
     try:
+        say("")
         wiz.welcome(environment_report())
         wiz.folder()
         wiz.history()
@@ -326,23 +395,27 @@ def run_wizard(
         saved = wiz.summary_and_save()
         if wiz.download:
             if "storage.dir" in wiz.changes and not saved:
-                say(f"Skipped the {wiz.download} download, since the new folder wasn't saved.")
+                say(" " + ui.warn(f"Skipped the {wiz.download} download, since the new folder wasn't saved."))
             else:
-                say(f"Downloading the {wiz.download} model...")
+                say(f"\n Downloading the {wiz.download} model...")
                 try:
                     download(wiz.download)
-                    say("Done.")
+                    say(" " + ui.ok("Done."))
                 except transcribe.TranscribeError as exc:
-                    say(f"Couldn't download it: {exc}\n  Try again later with `journal model download {wiz.download}`.")
+                    say(" " + ui.warn(f"Couldn't download it: {exc}"))
+                    say(f"   Try again later with `journal model download {wiz.download}`.")
         say("")
         code = 0
         if start_entry is not None and wiz.yes_no("Write your first entry now?", False):
             code = start_entry()
-        say("\nYou're set. A few good next commands:")
-        say("  journal add <words>     capture a thought in one line")
-        say("  journal read            reread your recent entries")
-        say("  journal docs            the built-in guide")
+        commands = [
+            ("journal add <words>", "capture a thought in one line"),
+            ("journal read", "reread your recent entries"),
+            ("journal docs", "the built-in guide"),
+        ]
+        rows = [f"{ui.style(f'{cmd:<20}', 'bold', 'cyan')} {text}" for cmd, text in commands]
+        say("\n" + ui.box("You're set. Good next commands", rows))
         return code
     except (EOFError, KeyboardInterrupt):
-        say("\nNothing was changed.")
+        say("\n " + ui.warn("Nothing was changed."))
         return 130

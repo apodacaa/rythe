@@ -96,11 +96,11 @@ def readline_safe(text: str) -> str:
 # -- glyphs: Unicode where the terminal can show it, plain ASCII otherwise ---------------------
 
 _UNICODE = {
-    "bar": "▌", "gutter": "┃", "arrow": "➜", "ok": "✔", "bad": "✖", "star": "✦", "dot": "·",
+    "bar": "▌", "gutter": "┃", "arrow": "➜", "ok": "✔", "bad": "✖", "star": "✦", "dot": "·", "ask": "❯",
     "rule": "─", "dbl": ("╔", "╗", "╚", "╝", "═", "║"), "box": ("┏", "┓", "┗", "┛", "━", "┃"),
 }
 _ASCII = {
-    "bar": "|", "gutter": "|", "arrow": "->", "ok": "+", "bad": "x", "star": "*", "dot": "-",
+    "bar": "|", "gutter": "|", "arrow": "->", "ok": "+", "bad": "x", "star": "*", "dot": "-", "ask": ">",
     "rule": "-", "dbl": ("+", "+", "+", "+", "=", "|"), "box": ("+", "+", "+", "+", "-", "|"),
 }
 
