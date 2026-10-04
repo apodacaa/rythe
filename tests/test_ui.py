@@ -103,6 +103,7 @@ COMMANDS = [
     ["prompts", "list"],
     ["prompts", "show", "hard"],
     ["setup", "--check"],
+    ["docs", "--list"],
     ["show", "last", "--no-pager"],
     ["read", "--since", "2020-01-01", "--no-pager"],
 ]
@@ -150,3 +151,69 @@ def test_reading_views_highlight_tags_and_labels(seeded, capsys, monkeypatch):
     assert ui.style("#work", "cyan") in out and ui.style("#home", "cyan") in out
     assert ui.style("voice memo", "magenta") in out
     assert ui.style("9:00 AM", "bold") in out
+
+
+SAMPLE_MD = """# Title
+
+Some **bold** text and `code` here.
+
+## Section
+
+- a bullet with `journal add`
+1. a numbered step
+
+> a quoted note
+
+```
+journal read --tag work
+```
+
+| Code | Meaning |
+|---|---|
+| 0 | ok |
+
+---
+
+### Small heading
+"""
+
+
+def test_style_markdown_renders_instead_of_showing_markup():
+    from journal import docs
+
+    ui.set_color(True)
+    out = docs.style_markdown(SAMPLE_MD)
+    plain = ui.strip_ansi(out)
+    assert "\x1b[" in out
+    for markup in ("```", "**", "`code`", "# Title", "## Section", "### Small"):
+        assert markup not in plain, markup
+    for text in ("Title", "Section", "Small heading", "journal read --tag work", "a bullet with journal add",
+                 "1. a numbered step", "a quoted note", "bold", "code"):
+        assert text in plain, text
+    assert "\n\n\n" not in plain  # no runs of blank lines
+
+
+def test_docs_on_a_terminal_are_styled_but_pipes_always_get_raw_markdown(capsys, monkeypatch):
+    from journal import docs
+
+    monkeypatch.setattr("journal.docs._on_terminal", lambda: True)
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    main(["docs", "json", "--no-pager"])
+    styled = capsys.readouterr().out
+    plain = ui.strip_ansi(styled)
+    assert "\x1b[" in styled and "```" not in plain and "# journal: JSON" not in plain
+    assert "journal: JSON output and exit codes" in plain  # the heading text is still there
+
+    monkeypatch.undo()
+    monkeypatch.setenv("FORCE_COLOR", "1")  # color forced, but stdout is a pipe here
+    main(["docs", "json"])
+    raw = capsys.readouterr().out
+    assert "\x1b" not in raw and raw.startswith("# journal: JSON output and exit codes")
+    assert "```" in raw  # untouched markdown, exactly what agents rely on
+
+
+def test_docs_json_is_never_styled(capsys, monkeypatch):
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    main(["docs", "config", "--json"])
+    out = capsys.readouterr().out
+    assert "\x1b" not in out and json.loads(out)["topics"] == ["config"]

@@ -898,6 +898,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_docs.add_argument("--list", action="store_true", help="list the topics")
     p_docs.add_argument("--all", action="store_true", help="print every topic")
     p_docs.add_argument("--json", action="store_true")
+    p_docs.add_argument("--no-pager", action="store_true")
     p_docs.set_defaults(func=docs.cmd_docs)
 
     p_setup = sub.add_parser(
