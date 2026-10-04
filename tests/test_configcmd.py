@@ -144,3 +144,58 @@ def test_prompts_list_and_show(capsys):
 
 def test_every_builtin_prompt_set_has_a_description():
     assert set(prompts.BUILTIN) == set(prompts.DESCRIPTIONS)
+
+
+def test_data_dir_precedence_env_then_setting_then_default(tmp_path, monkeypatch, capsys):
+    from pathlib import Path
+
+    from journal import store
+
+    monkeypatch.delenv("JOURNAL_DIR")
+    assert store.data_dir() == Path("~/.local/share/journal").expanduser()
+
+    chosen = tmp_path / "elsewhere"
+    assert run(capsys, "config", "set", "storage.dir", str(chosen))[0] == 0
+    assert store.data_dir() == chosen
+
+    monkeypatch.setenv("JOURNAL_DIR", str(tmp_path / "from-env"))
+    assert store.data_dir() == tmp_path / "from-env"
+
+
+def test_storage_dir_expands_tilde_and_is_used_for_entries(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv("JOURNAL_DIR")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    assert run(capsys, "config", "set", "storage.dir", "~/notes/journal")[0] == 0
+
+    assert main(["new", "--text", "stored under the configured dir"]) == 0
+    assert list((tmp_path / "notes" / "journal" / "entries").rglob("*.txt"))
+    capsys.readouterr()
+    assert run(capsys, "path")[1].strip() == str(tmp_path / "notes" / "journal")
+
+
+def test_storage_dir_must_be_absolute_or_tilde(capsys):
+    code, _, err = run(capsys, "config", "set", "storage.dir", "relative/path")
+    assert code == 1 and "absolute" in err
+    assert not config_path().exists()
+
+
+def test_changing_storage_dir_warns_that_entries_are_not_moved(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv("JOURNAL_DIR")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    old = tmp_path / ".local" / "share" / "journal"
+    (old / "entries").mkdir(parents=True)
+    (old / "entries" / "x.txt").write_text("hi")
+
+    code, _, err = run(capsys, "config", "set", "storage.dir", str(tmp_path / "new"))
+    assert code == 0 and "were not moved" in err and str(old) in err
+
+
+def test_journal_dir_env_overrides_and_set_says_so(tmp_path, capsys):
+    code, _, err = run(capsys, "config", "set", "storage.dir", str(tmp_path / "x"))  # conftest sets JOURNAL_DIR
+    assert code == 0 and "$JOURNAL_DIR is set and takes precedence" in err
+
+
+def test_storage_dir_shows_its_default_in_list_and_explain(capsys):
+    assert "~/.local/share/journal" in run(capsys, "config", "list")[1]
+    out = run(capsys, "config", "explain", "storage.dir")[1]
+    assert "default: ~/.local/share/journal" in out and "JOURNAL_DIR" in out

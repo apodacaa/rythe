@@ -93,7 +93,12 @@ def render_config() -> str:
         "## Settings",
     ]
     for s in settings.SETTINGS:
-        kind = {"bool": "true or false", "choice": "one of " + ", ".join(s.choices), "text": "text"}[s.kind]
+        kind = {
+            "bool": "true or false",
+            "choice": "one of " + ", ".join(s.choices),
+            "text": "text",
+            "path": "a folder path (absolute, or starting with ~)",
+        }[s.kind]
         out.append(
             f"### `{s.key}`\n\n{s.description}\n\n- type: {kind}\n- default: `{_default(s)}`\n- example: `{s.example}`"
         )
@@ -107,6 +112,8 @@ def render_config() -> str:
 
 
 def _default(s: settings.Setting) -> str:
+    if s.default is None and s.default_text:
+        return s.default_text
     return "true" if s.default is True else "false" if s.default is False else str(s.default)
 
 

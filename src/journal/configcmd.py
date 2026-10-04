@@ -7,13 +7,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 
-from . import prompts, settings
+from . import prompts, settings, store
 from .config import config_path, load_raw, write_raw
 
 
-def _fmt(value) -> str:
+def _fmt(value, setting: settings.Setting | None = None) -> str:
+    if value is None and setting is not None and setting.default_text:
+        return setting.default_text
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, list):
@@ -81,8 +84,8 @@ def cmd_config_list(args: argparse.Namespace) -> int:
         elif r["kind"] == "list":
             note = "(config file)"
         else:
-            note = f"(config file; default {_fmt(r['default'])})"
-        value = _fmt(r["value"])
+            note = f"(config file; default {_fmt(r['default'], settings.lookup(r['key']))})"
+        value = _fmt(r["value"], settings.lookup(r["key"]))
         if r["kind"] == "list":
             value = f"{len(r['value'])} prompt{'s' if len(r['value']) != 1 else ''}"
         print(f"  {r['key']:<{width}}  {value:<14} {note}")
@@ -112,8 +115,11 @@ def cmd_config_set(args: argparse.Namespace) -> int:
         return _unknown_key(args.key)
     value = settings.coerce(setting, args.values)  # ValueError -> "journal: ..." exit 1 in main
     raw = load_raw()
+    old_dir = store.data_dir() if args.key == "storage.dir" else None
     settings.set_in(raw, args.key, value)
     backup = write_raw(raw)
+    if old_dir is not None:
+        _storage_notes(old_dir)
     if args.json:
         print(json.dumps({"key": args.key, "value": value}, indent=2, ensure_ascii=False))
     else:
@@ -124,6 +130,23 @@ def cmd_config_set(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
     return 0
+
+
+def _storage_notes(old_dir) -> None:
+    new_dir = store.data_dir()
+    if os.environ.get("JOURNAL_DIR"):
+        print(
+            "journal: $JOURNAL_DIR is set and takes precedence, so it is still the folder in use; "
+            "unset it for this setting to apply",
+            file=sys.stderr,
+        )
+        return
+    if new_dir != old_dir and old_dir.exists() and any(old_dir.iterdir()):
+        print(
+            f"journal: entries already in {old_dir} were not moved; copy that whole folder to "
+            f"{new_dir} (it holds the git history too) or they won't show up",
+            file=sys.stderr,
+        )
 
 
 def cmd_config_unset(args: argparse.Namespace) -> int:
@@ -147,9 +170,9 @@ def cmd_config_unset(args: argparse.Namespace) -> int:
 def _explain_text(setting: settings.Setting, raw: dict) -> str:
     lines = [setting.key, f"  {setting.description}", f"  type: {_kind_label(setting)}"]
     if setting.kind != "list":
-        lines.append(f"  default: {_fmt(setting.default)}")
+        lines.append(f"  default: {_fmt(setting.default, setting)}")
         value, source = settings.current(raw, setting)
-        lines.append(f"  now: {_fmt(value)} ({source})")
+        lines.append(f"  now: {_fmt(value, setting)} ({source})")
     lines.append(f"  example: {setting.example}")
     return "\n".join(lines)
 
@@ -161,6 +184,8 @@ def _kind_label(setting: settings.Setting) -> str:
         return "one of " + ", ".join(setting.choices)
     if setting.kind == "list":
         return "one or more prompts (text)"
+    if setting.kind == "path":
+        return "a folder path (absolute, or starting with ~)"
     return "text"
 
 

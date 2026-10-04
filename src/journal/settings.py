@@ -6,6 +6,7 @@ add the field to `config.py`, add a `Setting` below, and the CLI and docs pick i
 """
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
 
@@ -17,14 +18,26 @@ PROMPT_NAME_RE = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
 @dataclass(frozen=True)
 class Setting:
     key: str  # dotted, e.g. "history.enabled"
-    kind: str  # "bool" | "choice" | "text" | "list"
+    kind: str  # "bool" | "choice" | "text" | "path" | "list"
     default: object
     description: str
     example: str
     choices: tuple[str, ...] = ()
+    default_text: str = ""  # how to show a default that isn't a plain value (e.g. a path)
 
 
 SETTINGS: list[Setting] = [
+    Setting(
+        "storage.dir",
+        "path",
+        None,
+        "The folder where entries (and audio, whisper models, drafts, trash and the git history) "
+        "are stored. Absolute, or starting with ~. The $JOURNAL_DIR environment variable, if set, "
+        "takes precedence. Changing it does not move existing entries: copy the old folder to the "
+        "new location first (see `journal docs concepts`). `journal path` prints the folder in use.",
+        "journal config set storage.dir ~/Documents/journal",
+        default_text="~/.local/share/journal",
+    ),
     Setting(
         "history.enabled",
         "bool",
@@ -84,7 +97,12 @@ PROMPTS_PATTERN = Setting(
 )
 
 ENV_VARS: list[tuple[str, str]] = [
-    ("JOURNAL_DIR", "Where entries live (default ~/.local/share/journal). Tests always set this."),
+    (
+        "JOURNAL_DIR",
+        "Where entries live. Overrides the `storage.dir` setting (default ~/.local/share/journal). "
+        "Only applies to programs started from a shell that exports it; to make the choice stick "
+        "everywhere, use `journal config set storage.dir` instead. Tests always set this.",
+    ),
     ("JOURNAL_CONFIG", "Path of the config file (default ~/.config/journal/config.toml)."),
     ("EDITOR", "Editor opened by write/new --editor/edit (falls back to nvim, vim, then vi)."),
     ("PAGER", "Pager for read/show/review output on a terminal (falls back to `less -R`, else plain print)."),
@@ -136,6 +154,8 @@ def coerce(setting: Setting, values: list[str]):
         if lowered in ("false", "no", "off", "0"):
             return False
         raise ValueError(f"{setting.key} is true/false, not {value!r}")
+    if setting.kind == "path" and not (value.startswith("~") or os.path.isabs(value)):
+        raise ValueError(f"{setting.key} must be an absolute path, or start with ~ (got {value!r})")
     if setting.kind == "choice" and value not in setting.choices:
         raise ValueError(f"{setting.key} must be one of: {', '.join(setting.choices)}")
     if not value.strip():

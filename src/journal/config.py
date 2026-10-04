@@ -35,11 +35,17 @@ class ResurfaceConfig:
 
 
 @dataclass
+class StorageConfig:
+    dir: str | None = None  # None means the default location (see store.data_dir)
+
+
+@dataclass
 class Config:
     transcribe: TranscribeConfig = field(default_factory=TranscribeConfig)
     memo: MemoConfig = field(default_factory=MemoConfig)
     history: HistoryConfig = field(default_factory=HistoryConfig)
     resurface: ResurfaceConfig = field(default_factory=ResurfaceConfig)
+    storage: StorageConfig = field(default_factory=StorageConfig)
     prompts: dict[str, list[str]] = field(default_factory=dict)
 
 
@@ -72,6 +78,7 @@ def load_config() -> Config:
         memo=MemoConfig(**_known(MemoConfig, raw.get("memo", {}))),
         history=HistoryConfig(**_known(HistoryConfig, raw.get("history", {}))),
         resurface=ResurfaceConfig(**_known(ResurfaceConfig, raw.get("resurface", {}))),
+        storage=StorageConfig(**_known(StorageConfig, raw.get("storage", {}))),
         prompts={name: list(items) for name, items in raw.get("prompts", {}).items()},
     )
 

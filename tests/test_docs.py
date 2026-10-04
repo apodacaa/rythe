@@ -82,3 +82,8 @@ def test_overview_links_every_other_topic():
     for name in docs.TOPICS:
         if name != "overview":
             assert f"journal docs {name}" in text, name
+
+
+def test_concepts_explains_choosing_and_moving_the_data_folder():
+    text = docs.render_topic("concepts")
+    assert "storage.dir" in text and "JOURNAL_DIR" in text and "Moving your journal" in text

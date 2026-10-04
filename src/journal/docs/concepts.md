@@ -61,8 +61,12 @@ same id exits 3 unless `--force` is given.
 
 ## Data layout
 
+The data folder defaults to `~/.local/share/journal`. Choose another with
+`journal config set storage.dir <folder>` (absolute, or starting with `~`); the `JOURNAL_DIR`
+environment variable overrides that when set. `journal path` prints the folder in use.
+
 ```
-~/.local/share/journal/        (override with JOURNAL_DIR)
+~/.local/share/journal/        (storage.dir, or JOURNAL_DIR)
   entries/2026/09/2026-09-30T164608.txt
   audio/2026-09-30T164608.m4a      original voice memos
   models/ggml-small.bin            whisper models (not in history)
@@ -74,3 +78,21 @@ same id exits 3 unless `--force` is given.
 
 Entry files are a small frontmatter block (`created`, `updated`, `source`, `title`, …) followed by
 the text.
+
+## Moving your journal
+
+Changing `storage.dir` only changes where the journal looks; it does not move files. To relocate
+an existing journal, move the whole folder (it contains the entries, audio and the git history),
+then point the setting at it:
+
+```
+journal path                                   # the current folder, e.g. ~/.local/share/journal
+mv ~/.local/share/journal ~/Documents/journal
+journal config set storage.dir ~/Documents/journal
+journal list --limit 3                         # your entries are there
+```
+
+If `JOURNAL_DIR` is set in your shell it wins over the setting, so unset it (or change it) too.
+`journal config set storage.dir` warns about both situations. Programs not started from your
+shell (an agent, a scheduler) don't see shell variables, which is why the setting is the reliable
+choice.
