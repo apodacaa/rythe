@@ -559,3 +559,27 @@ def test_tag_and_delete_accept_refs(capsys):
     capsys.readouterr()
     assert main(["tag", "last", "x"]) == 0
     assert main(["delete", "2026-09-30"]) == 0
+
+
+def test_add_joins_words_and_appends_tags(capsys):
+    assert main(["add", "had", "coffee", "with", "Sam", "-t", "friends", "-t", "#morning", "--json"]) == 0
+    entry = json.loads(capsys.readouterr().out)
+    assert entry["body"].splitlines()[0] == "had coffee with Sam"
+    assert entry["tags"] == ["friends", "morning"]
+    assert entry["source"] == "cli"
+
+
+def test_add_does_not_duplicate_a_tag_already_in_the_text(capsys):
+    main(["add", "quoted #friends text", "-t", "friends", "--json"])
+    assert json.loads(capsys.readouterr().out)["body"].count("#friends") == 1
+
+
+def test_add_reads_stdin_without_words_and_refuses_empty(monkeypatch, capsys):
+    import io
+
+    monkeypatch.setattr("sys.stdin", io.StringIO("from a pipe"))
+    assert main(["add", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["body"].strip() == "from a pipe"
+
+    monkeypatch.setattr("sys.stdin", io.StringIO("  \n"))
+    assert main(["add"]) == 1

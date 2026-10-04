@@ -2,6 +2,7 @@
 
 Examples:
   journal new --text "Had a good day #gratitude"
+  journal add had coffee with Sam -t friends   # one-line capture; -t because shells eat '#'
   journal new --editor                        # compose in $EDITOR instead
   echo "typed from a script" | journal new --source cli
   journal list --since 2026-09-01 --tag work
@@ -150,6 +151,30 @@ def cmd_new(args: argparse.Namespace) -> int:
         if _interactive():
             _print_resurfaced(entry)
     return 0
+
+
+def cmd_add(args: argparse.Namespace) -> int:
+    if args.words:
+        body = " ".join(args.words)
+    else:
+        if sys.stdin.isatty():
+            print("(type your entry, then Ctrl-D to save, or Ctrl-C to abort)", file=sys.stderr)
+        body = sys.stdin.read()
+    if not body.strip():
+        print("journal: nothing to add (give some words, or pipe text in)", file=sys.stderr)
+        return 1
+    present = set(extract_tags(body))
+    missing = []
+    for tag in (normalize_tag(t) for t in args.tag or []):
+        if tag not in present and tag not in missing:
+            missing.append(tag)
+    if missing:
+        body = body.rstrip("\n") + "\n" + " ".join(f"#{t}" for t in missing) + "\n"
+    return cmd_new(
+        argparse.Namespace(
+            at=args.at, title="", source="cli", text=body, editor=False, json=args.json
+        )
+    )
 
 
 def cmd_list(args: argparse.Namespace) -> int:
@@ -543,6 +568,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_new.add_argument("--json", action="store_true")
     p_new.set_defaults(func=cmd_new)
+
+    p_add = sub.add_parser(
+        "add",
+        help="one-line capture: journal add had coffee with Sam -t friends",
+        description=(
+            "Create an entry from the words on the command line. Tag with -t, or quote the text: "
+            "in most shells an unquoted #tag starts a comment and is silently dropped."
+        ),
+    )
+    p_add.add_argument("words", nargs="*", help="the entry text; reads stdin if omitted")
+    p_add.add_argument("-t", "--tag", action="append", help="repeatable; appended as a #tag line")
+    p_add.add_argument("--at", metavar="ISO", help="timestamp; default now")
+    p_add.add_argument("--json", action="store_true")
+    p_add.set_defaults(func=cmd_add)
 
     p_list = sub.add_parser("list", help="list entries, newest first")
     p_list.add_argument("--since", metavar="ISO")
