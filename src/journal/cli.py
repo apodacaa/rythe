@@ -33,6 +33,13 @@ Examples:
 
 With no subcommand (or `journal write`), opens $EDITOR on a new entry — same as `journal new
 --editor`.
+
+Config (optional, ~/.config/journal/config.toml):
+  [history]   enabled = false        # stop auto-committing each write to git in the data dir
+  [resurface] enabled = false        # stop showing an older entry after you save a new one
+  [prompts]   mine = ["question?"]   # your own sets for `--prompt mine`
+  [transcribe] model, language       # whisper.cpp settings for `ingest audio`
+  [memo]      subject_prefix         # subject prefix the journal-sweep skill looks for
 """
 from __future__ import annotations
 
@@ -57,6 +64,12 @@ from .dates import (
 )
 from .entry import Entry
 from .tags import extract_tags, normalize_tag
+
+
+_PROMPT_HELP = (
+    "show a writing prompt below the page (removed on save); sets: today (default), hard, "
+    "distance, review, or your own under [prompts] in config"
+)
 
 
 def _now() -> datetime:
@@ -656,7 +669,7 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="?",
         const="today",
         metavar="SET",
-        help="show a writing prompt below the page (removed on save); sets: today, hard, distance, or your own in config",
+        help=_PROMPT_HELP,
     )
     p_new.add_argument("--json", action="store_true")
     p_new.set_defaults(func=cmd_new)
@@ -700,7 +713,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_read.add_argument("--no-pager", action="store_true")
     p_read.set_defaults(func=cmd_read)
 
-    p_show = sub.add_parser("show", help="print a full entry")
+    p_show = sub.add_parser(
+        "show",
+        help="print one entry (id, `last`, `today`, or a unique prefix)",
+        description=(
+            "Print one entry as prose. The id can be a full id, `last`, `today`, or a unique "
+            "prefix like 2026-09-30; leave it off to pick with fzf (or fall back to the last "
+            "entry). --raw prints the file as stored, frontmatter included; --json is the "
+            "stable, scriptable form."
+        ),
+    )
     p_show.add_argument("id", nargs="?", help="id, `last`, `today`, or a unique prefix; omit to pick with fzf")
     p_show.add_argument("--json", action="store_true")
     p_show.add_argument("--raw", action="store_true", help="print the file as stored, frontmatter included")
@@ -733,6 +755,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_status = sub.add_parser(
         "status",
         help="when you last wrote, and how this week is going (for prompts, status bars, schedulers)",
+        description=(
+            "Print when you last wrote and how many entries this week. --json gives "
+            "{last_entry_id, last_entry_at, days_since, week_count, on_this_day_count} "
+            "(nulls/zeros for an empty journal) — cheap enough to call from a shell prompt, "
+            "status bar or scheduled reminder."
+        ),
     )
     p_status.add_argument("--json", action="store_true")
     p_status.set_defaults(func=cmd_status)
@@ -740,6 +768,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_review = sub.add_parser(
         "review",
         help="look back over a stretch of entries, then write a reflection (default: the last 7 days)",
+        description=(
+            "Show the period (your entries, oldest first, past #review entries left out), then "
+            "open $EDITOR with reflection questions below the page. Saved as an entry titled "
+            "\"Week of …\" (or \"Review of …\" for a custom range) and tagged #review."
+        ),
     )
     p_review.add_argument("--since", metavar="ISO")
     p_review.add_argument("--until", metavar="ISO")
@@ -764,7 +797,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_delete.add_argument("--json", action="store_true")
     p_delete.set_defaults(func=cmd_delete)
 
-    p_edit = sub.add_parser("edit", help="open an entry in $EDITOR (falls back to nvim, vim, then vi)")
+    p_edit = sub.add_parser(
+        "edit",
+        help="edit an entry's text in $EDITOR (falls back to nvim, vim, then vi)",
+        description=(
+            "Open an entry's body in $EDITOR. The editor never sees the frontmatter, so an edit "
+            "can't corrupt it, and `updated` is stamped only if the text actually changed. "
+            "Emptying the body is refused (use `journal delete`). The id can be a full id, "
+            "`last`, `today`, or a unique prefix; leave it off to pick with fzf (or fall back "
+            "to the last entry)."
+        ),
+    )
     p_edit.add_argument("id", nargs="?", help="id, `last`, `today`, or a unique prefix; omit to pick with fzf")
     p_edit.set_defaults(func=cmd_edit)
 
@@ -820,7 +863,7 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="?",
         const="today",
         metavar="SET",
-        help="show a writing prompt below the page (removed on save); sets: today, hard, distance, or your own in config",
+        help=_PROMPT_HELP,
     )
     p_write.set_defaults(func=cmd_write)
 
