@@ -222,9 +222,16 @@ class _Wizard:
             if shutil.which(name) is None:
                 hint = next(c["hint"] for c in environment_report()["checks"] if c["name"] == name)
                 self.say(f"  note: {name} not found. {hint}.")
-        self.say("  Bigger models are more accurate but slower and larger to download:")
+        self.say("  Pick a speech model. Bigger ones are more accurate but slower and larger to "
+                 "download. All of them understand many languages and run entirely on this computer.")
         for name in transcribe.KNOWN_MODELS:
-            self.say(f"    {name:<7} {transcribe.format_size(name)}")
+            tags = []
+            if name == transcribe.RECOMMENDED_MODEL:
+                tags.append("recommended")
+            if self._model_file(name).exists():
+                tags.append("downloaded")
+            tag = f" [{', '.join(tags)}]" if tags else ""
+            self.say(f"    {name:<7} {transcribe.format_size(name):<8} {transcribe.MODEL_NOTES[name]}{tag}")
         model_setting = settings.lookup("transcribe.model")
         default = self.current("transcribe.model")
         while True:
@@ -249,6 +256,8 @@ class _Wizard:
             self.say(f"  The {model} model is already downloaded.")
         elif self.yes_no(f"Download the {model} model now ({transcribe.format_size(model)})?", False):
             self.download = model
+        else:
+            self.say(f"  OK. Voice memos won't work until it's downloaded: `journal model download {model}`.")
 
     def _model_file(self, model: str) -> Path:
         """Where `model` will live: under the folder chosen in this run, if it changed."""

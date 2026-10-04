@@ -24,6 +24,18 @@ KNOWN_MODELS = {
 MODEL_SIZES_MB = {"tiny": 75, "base": 142, "small": 466, "medium": 1500, "large": 2900}
 
 
+# What each model is like, in plain language, for people choosing one. Memory figures are
+# approximate (from the whisper.cpp project's own table).
+RECOMMENDED_MODEL = "small"
+MODEL_NOTES = {
+    "tiny": "fastest and roughest; fine for trying things out, misses words in anything but clear speech",
+    "base": "fast; OK for clear speech close to the microphone",
+    "small": "the usual sweet spot: good accuracy at a reasonable speed on a laptop CPU",
+    "medium": "noticeably more accurate (names, accents, background noise) but slow on a CPU; needs about 2 GB of memory",
+    "large": "the most accurate, but heavy: about 4 GB of memory and slow without a GPU",
+}
+
+
 def format_size(name: str) -> str:
     mb = MODEL_SIZES_MB[name]
     return f"~{mb / 1000:.1f} GB" if mb >= 1000 else f"~{round(mb, -1) if mb >= 100 else mb} MB"
@@ -69,6 +81,7 @@ def list_models() -> list[dict]:
             "file": filename,
             "downloaded": (models_dir() / filename).exists(),
             "approx_mb": MODEL_SIZES_MB[name],
+            "note": MODEL_NOTES[name],
         }
         for name, filename in KNOWN_MODELS.items()
     ]
