@@ -16,7 +16,13 @@ from .config import config_path, load_config, load_raw, write_raw
 from .configcmd import _fmt
 
 # The settings the wizard asks about; a test checks each one is in the settings registry.
-WIZARD_KEYS = ("storage.dir", "history.enabled", "resurface.enabled")
+WIZARD_KEYS = (
+    "storage.dir",
+    "history.enabled",
+    "resurface.enabled",
+    "transcribe.model",
+    "transcribe.language",
+)
 
 
 def _check(name: str, found: bool, detail: str, needed_for: str, hint: str) -> dict:
@@ -122,6 +128,7 @@ class _Wizard:
         self.raw = load_raw()
         self.changes: dict[str, tuple[object, object]] = {}  # key -> (old, new)
         self.moved_from: Path | None = None
+        self.download: str | None = None  # a whisper model to fetch after saving
 
     # -- small helpers --------------------------------------------------------------------
     def yes_no(self, question: str, default: bool) -> bool:
@@ -205,6 +212,50 @@ class _Wizard:
             self.yes_no("Show an older entry after I save one?", bool(self.current("resurface.enabled"))),
         )
 
+    def voice_memos(self) -> None:
+        self.say("\nVoice memos?")
+        self.say("  journal can turn a recording into an entry, transcribing it on this computer with "
+                 "whisper.cpp (no audio ever leaves it).")
+        if not self.yes_no("Will you use voice memos?", False):
+            return
+        for name in ("ffmpeg", "whisper-cli"):
+            if shutil.which(name) is None:
+                hint = next(c["hint"] for c in environment_report()["checks"] if c["name"] == name)
+                self.say(f"  note: {name} not found. {hint}.")
+        self.say("  Bigger models are more accurate but slower and larger to download:")
+        for name in transcribe.KNOWN_MODELS:
+            self.say(f"    {name:<7} {transcribe.format_size(name)}")
+        model_setting = settings.lookup("transcribe.model")
+        default = self.current("transcribe.model")
+        while True:
+            answer = self.ask(f"Which model? [{default}] ").strip() or default
+            try:
+                model = settings.coerce(model_setting, [answer])
+                break
+            except ValueError as exc:
+                self.say(f"  {exc}")
+        self.propose("transcribe.model", model)
+
+        default = self.current("transcribe.language")
+        while True:
+            answer = (self.ask(f"Language spoken in your memos (a code like en, de, es, or auto) [{default}] ")
+                      .strip().lower() or default)
+            if answer == "auto" or (answer.isalpha() and 2 <= len(answer) <= 3):
+                break
+            self.say("  Use a short language code such as en, de or es, or `auto` to detect it each time.")
+        self.propose("transcribe.language", answer)
+
+        if self._model_file(model).exists():
+            self.say(f"  The {model} model is already downloaded.")
+        elif self.yes_no(f"Download the {model} model now ({transcribe.format_size(model)})?", False):
+            self.download = model
+
+    def _model_file(self, model: str) -> Path:
+        """Where `model` will live: under the folder chosen in this run, if it changed."""
+        folder = self.changes.get("storage.dir")
+        base = Path(folder[1]).expanduser() if folder else store.data_dir()
+        return base / "models" / transcribe.KNOWN_MODELS[model]
+
     def prompts_info(self) -> None:
         extra = load_config().prompts
         self.say("\nWriting prompts (always optional; a bare `journal` is a blank page):")
@@ -239,20 +290,41 @@ class _Wizard:
         return True
 
 
+def _download(model: str) -> None:
+    import sys
+
+    transcribe.download_model(model, progress=transcribe.progress_printer(model))
+    print(file=sys.stderr)
+
+
 def run_wizard(
     ask: Callable[[str], str] = input,
     say: Callable[[str], None] = print,
     start_entry: Callable[[], int] | None = None,
+    download: Callable[[str], None] = _download,
 ) -> int:
-    """The interactive setup. `ask`, `say` and `start_entry` are injected so tests can script it."""
+    """The interactive setup. `ask`, `say`, `start_entry` and `download` are injected so tests can
+    script it without a terminal or the network.
+    """
     wiz = _Wizard(ask, say)
     try:
         wiz.welcome(environment_report())
         wiz.folder()
         wiz.history()
         wiz.resurface()
+        wiz.voice_memos()
         wiz.prompts_info()
-        wiz.summary_and_save()
+        saved = wiz.summary_and_save()
+        if wiz.download:
+            if "storage.dir" in wiz.changes and not saved:
+                say(f"Skipped the {wiz.download} download, since the new folder wasn't saved.")
+            else:
+                say(f"Downloading the {wiz.download} model...")
+                try:
+                    download(wiz.download)
+                    say("Done.")
+                except transcribe.TranscribeError as exc:
+                    say(f"Couldn't download it: {exc}\n  Try again later with `journal model download {wiz.download}`.")
         say("")
         code = 0
         if start_entry is not None and wiz.yes_no("Write your first entry now?", False):

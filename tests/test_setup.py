@@ -91,14 +91,14 @@ def home(tmp_path, monkeypatch):
 
 
 def test_accepting_every_default_changes_nothing(home):
-    s = Session("", "", "", "")  # keep folder, history, resurface, no first entry
+    s = Session("", "", "", "", "")  # keep folder, history, resurface, no voice memos, no first entry
     assert s.run(start_entry=lambda: 0) == 0
     assert not config_path().exists()
     assert "Nothing to change" in s.text and "journal docs" in s.text
 
 
 def test_changing_one_answer_writes_only_that_key(home):
-    s = Session("", "n", "", "y", "")  # history off, then save
+    s = Session("", "n", "", "", "y", "")  # history off, no voice memos, then save
     assert s.run() == 0
     assert load_raw() == {"history": {"enabled": False}}
     assert "history.enabled: true -> false" in s.text
@@ -110,7 +110,7 @@ def test_bad_folder_is_asked_again_then_saved_with_move_hint(home):
     (old / "2026-01-01T080000.txt").write_text("---\ncreated: 2026-01-01T08:00:00+00:00\n---\nhi\n")
     new = home / "Documents" / "journal"
 
-    s = Session("n", "relative/path", str(new), "", "", "y", "")
+    s = Session("n", "relative/path", str(new), "", "", "", "y", "")
     assert s.run() == 0
     assert "must be an absolute path" in s.text
     assert load_raw() == {"storage": {"dir": str(new)}}
@@ -120,7 +120,7 @@ def test_bad_folder_is_asked_again_then_saved_with_move_hint(home):
 
 def test_journal_dir_env_skips_the_folder_question(tmp_path, monkeypatch):
     monkeypatch.setattr("journal.setup.shutil.which", lambda name: f"/usr/bin/{name}")
-    s = Session("", "", "")  # history, resurface, first entry (conftest sets JOURNAL_DIR)
+    s = Session("", "", "", "")  # history, resurface, voice, first entry (conftest sets JOURNAL_DIR)
     assert s.run(start_entry=lambda: 0) == 0
     assert "overrides the storage.dir setting" in s.text
     assert not any("Keep it here" in p for p in s.prompts)
@@ -128,7 +128,7 @@ def test_journal_dir_env_skips_the_folder_question(tmp_path, monkeypatch):
 
 def test_missing_git_skips_the_history_question(home, monkeypatch):
     monkeypatch.setattr("journal.setup.shutil.which", lambda name: None if name == "git" else f"/usr/bin/{name}")
-    s = Session("", "", "")  # folder, resurface, first entry
+    s = Session("", "", "", "")  # folder, resurface, voice, first entry
     assert s.run(start_entry=lambda: 0) == 0
     assert "git isn't installed" in s.text and not any("local history" in p for p in s.prompts)
 
@@ -140,14 +140,14 @@ def test_cancelling_before_the_summary_changes_nothing(home):
 
 
 def test_declining_the_final_save_writes_nothing(home):
-    s = Session("", "n", "", "n", "")
+    s = Session("", "n", "", "", "n", "")
     assert s.run() == 0
     assert "Nothing was saved" in s.text and not config_path().exists()
 
 
 def test_rerun_shows_current_values_as_the_defaults(home):
     main(["config", "set", "history.enabled", "false"])
-    s = Session("", "", "", "")
+    s = Session("", "", "", "", "")
     s.run()
     assert any("Keep a local history? [y/N]" in p for p in s.prompts)
     assert load_raw() == {"history": {"enabled": False}}  # unchanged by accepting defaults
@@ -155,10 +155,10 @@ def test_rerun_shows_current_values_as_the_defaults(home):
 
 def test_first_entry_is_offered_and_started_on_yes(home):
     started = []
-    Session("", "", "", "y").run(start_entry=lambda: started.append(1) or 0)
+    Session("", "", "", "", "y").run(start_entry=lambda: started.append(1) or 0)
     assert started == [1]
     started.clear()
-    Session("", "", "", "n").run(start_entry=lambda: started.append(1) or 0)
+    Session("", "", "", "", "n").run(start_entry=lambda: started.append(1) or 0)
     assert started == []
 
 
@@ -177,3 +177,76 @@ def test_every_builtin_prompt_set_has_a_one_line_summary():
     from journal import prompts
 
     assert set(prompts.BUILTIN) == set(prompts.SUMMARIES)
+
+
+def _downloads():
+    calls = []
+    return calls, lambda model: calls.append((model, config_path().exists()))
+
+
+def test_voice_memo_answers_are_saved_and_download_can_be_declined(home):
+    calls, download = _downloads()
+    s = Session("", "", "", "y", "medium", "auto", "n", "y", "")  # ... model, language, no download, save
+    assert s.run(download=download) == 0
+    assert load_raw() == {"transcribe": {"model": "medium", "language": "auto"}}
+    assert calls == []
+    assert "~1.5 GB" in s.text and "~470 MB" in s.text  # sizes are shown before choosing
+
+
+def test_download_runs_after_the_config_is_saved_in_the_new_folder(home):
+    calls, download = _downloads()
+    new = home / "Documents" / "journal"
+    s = Session("n", str(new), "", "", "y", "", "", "y", "y", "")  # folder, voice(small, en), download, save
+    assert s.run(download=download) == 0
+    assert calls == [("small", True)]  # config already written when the download starts
+    assert load_raw()["storage"]["dir"] == str(new)
+
+
+def test_download_is_skipped_when_a_new_folder_was_not_saved(home):
+    calls, download = _downloads()
+    new = home / "elsewhere"
+    s = Session("n", str(new), "", "", "y", "", "", "y", "n", "")  # ... download yes, save NO
+    s.run(download=download)
+    assert calls == [] and "Skipped the small download" in s.text
+
+
+def test_already_downloaded_model_is_not_offered_again(home):
+    model = home / ".local" / "share" / "journal" / "models" / "ggml-small.bin"
+    model.parent.mkdir(parents=True)
+    model.write_bytes(b"x")
+    calls, download = _downloads()
+    s = Session("", "", "", "y", "", "", "")  # voice yes, defaults, then first entry
+    s.run(download=download)
+    assert "already downloaded" in s.text and calls == []
+    assert not any("Download the" in p for p in s.prompts)
+
+
+def test_bad_model_and_language_are_asked_again(home):
+    s = Session("", "", "", "y", "gigantic", "tiny", "english", "es", "n", "y", "")
+    s.run(download=_downloads()[1])
+    assert "must be one of" in s.text and "short language code" in s.text
+    assert load_raw() == {"transcribe": {"model": "tiny", "language": "es"}}
+
+
+def test_missing_voice_tools_are_explained(home, monkeypatch):
+    monkeypatch.setattr("journal.setup.shutil.which", lambda name: None if name in ("ffmpeg", "whisper-cli") else "/x")
+    s = Session("", "", "", "y", "", "", "n", "")
+    s.run(download=_downloads()[1])
+    assert "ffmpeg not found" in s.text and "whisper-cli not found" in s.text
+
+
+def test_failed_download_is_reported_and_setup_carries_on(home):
+    from journal.transcribe import TranscribeError
+
+    def failing(model):
+        raise TranscribeError("network down")
+
+    s = Session("", "", "", "y", "", "", "y", "", "")
+    assert s.run(download=failing) == 0
+    assert "network down" in s.text and "journal model download small" in s.text
+
+
+def test_saying_no_to_voice_memos_asks_nothing_more(home):
+    s = Session("", "", "", "", "")
+    s.run()
+    assert not any("Which model" in p for p in s.prompts)

@@ -634,15 +634,10 @@ def cmd_ingest_seen(args: argparse.Namespace) -> int:
 
 
 def cmd_model_download(args: argparse.Namespace) -> int:
-    def progress(downloaded: int, total: int) -> None:
-        if total:
-            pct = downloaded * 100 // total
-            mb = downloaded // (1024 * 1024)
-            total_mb = total // (1024 * 1024)
-            print(f"\rdownloading {args.name}: {pct}% ({mb} / {total_mb} MB)", end="", file=sys.stderr)
-
     try:
-        path = transcribe.download_model(args.name, force=args.force, progress=progress)
+        path = transcribe.download_model(
+            args.name, force=args.force, progress=transcribe.progress_printer(args.name)
+        )
     except transcribe.TranscribeError as exc:
         print(f"\njournal: {exc}", file=sys.stderr)
         return 1
@@ -659,7 +654,7 @@ def cmd_model_list(args: argparse.Namespace) -> int:
     else:
         for m in models:
             mark = "x" if m["downloaded"] else " "
-            print(f"[{mark}] {m['name']:8} {m['file']}")
+            print(f"[{mark}] {m['name']:8} {m['file']}  {transcribe.format_size(m['name'])}")
     return 0
 
 
