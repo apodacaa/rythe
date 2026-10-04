@@ -17,6 +17,7 @@ Examples:
   journal search --tag work                  # tag filter alone, no text query
   journal list --on 2026-09-30
   journal list --untagged
+  journal review                              # read your week, then write a #review entry about it
   journal status                              # last entry, entries this week; also --json
   journal on-this-day                        # entries from today's date in any past year
   journal on-this-day --date monday           # bare weekday names work; "last monday" doesn't
@@ -149,6 +150,8 @@ def cmd_new(args: argparse.Namespace) -> int:
         body = sys.stdin.read()
     else:
         body = args.text
+    if getattr(args, "ensure_tags", None):
+        body = _with_tags(body, args.ensure_tags)
     entry = store.create(created=created, body=body, source=args.source, title=args.title or "")
     if draft is not None:
         draft.unlink(missing_ok=True)
@@ -161,6 +164,18 @@ def cmd_new(args: argparse.Namespace) -> int:
     return 0
 
 
+def _with_tags(body: str, tags: list[str]) -> str:
+    """Append a final #tag line for any of `tags` the body doesn't already carry."""
+    present = set(extract_tags(body))
+    missing: list[str] = []
+    for tag in (normalize_tag(t) for t in tags):
+        if tag not in present and tag not in missing:
+            missing.append(tag)
+    if not missing:
+        return body
+    return body.rstrip("\n") + "\n" + " ".join(f"#{t}" for t in missing) + "\n"
+
+
 def cmd_add(args: argparse.Namespace) -> int:
     if args.words:
         body = " ".join(args.words)
@@ -171,13 +186,7 @@ def cmd_add(args: argparse.Namespace) -> int:
     if not body.strip():
         print("journal: nothing to add (give some words, or pipe text in)", file=sys.stderr)
         return 1
-    present = set(extract_tags(body))
-    missing = []
-    for tag in (normalize_tag(t) for t in args.tag or []):
-        if tag not in present and tag not in missing:
-            missing.append(tag)
-    if missing:
-        body = body.rstrip("\n") + "\n" + " ".join(f"#{t}" for t in missing) + "\n"
+    body = _with_tags(body, args.tag or [])
     return cmd_new(
         argparse.Namespace(
             at=args.at, title="", source="cli", text=body, editor=False, prompt=None, json=args.json
@@ -404,6 +413,36 @@ def cmd_status(args: argparse.Namespace) -> int:
     if status["on_this_day_count"]:
         print(f"on this day: {status['on_this_day_count']} from past years")
     return 0
+
+
+def cmd_review(args: argparse.Namespace) -> int:
+    today = _now().date()
+    custom = bool(args.since or args.until)
+    since = _parse_since(args.since) if args.since else _parse_since((today - timedelta(days=6)).isoformat())
+    until = _parse_until(args.until) if args.until else None
+    if not args.no_read:
+        # Past reviews are left out so a review reads the days themselves, not earlier summaries.
+        entries = store.list_entries(since=since, until=until, exclude_tags=["review"])
+        if entries:
+            entries.reverse()
+            _output(render.render_entries(entries, show_id=False), no_pager=args.no_pager)
+        else:
+            print("nothing written in that period", file=sys.stderr)
+    first = since.date()
+    last = until.date() if until else today
+    span = f"{first:%b} {first.day} – {last:%b} {last.day}"
+    return cmd_new(
+        argparse.Namespace(
+            at=None,
+            title=f"{'Review of' if custom else 'Week of'} {span}",
+            source="cli",
+            text=None,
+            editor=True,
+            prompt="review",
+            ensure_tags=["review"],
+            json=False,
+        )
+    )
 
 
 def cmd_tags(args: argparse.Namespace) -> int:
@@ -697,6 +736,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_status.add_argument("--json", action="store_true")
     p_status.set_defaults(func=cmd_status)
+
+    p_review = sub.add_parser(
+        "review",
+        help="look back over a stretch of entries, then write a reflection (default: the last 7 days)",
+    )
+    p_review.add_argument("--since", metavar="ISO")
+    p_review.add_argument("--until", metavar="ISO")
+    p_review.add_argument("--no-read", action="store_true", help="skip showing the period first")
+    p_review.add_argument("--no-pager", action="store_true")
+    p_review.set_defaults(func=cmd_review)
 
     p_tags = sub.add_parser("tags", help="tag counts across entries")
     p_tags.add_argument("--since", metavar="ISO")

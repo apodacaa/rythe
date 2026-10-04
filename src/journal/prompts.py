@@ -27,6 +27,13 @@ BUILTIN: dict[str, list[str]] = {
         "using your own name or \"you\" instead of \"I\". What would you notice from the outside?\n"
         "(Skip this one if you're feeling very low.)",
     ],
+    "review": [
+        "Looking back over this stretch:\n"
+        "  - Where did your energy go? Was that where you wanted it to go?\n"
+        "  - What small progress are you glad about?\n"
+        "  - What's still unresolved, and what is one next step that's in your hands?\n"
+        "  - What do you see differently now than when it happened?"
+    ],
 }
 
 
