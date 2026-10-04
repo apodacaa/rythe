@@ -8,6 +8,8 @@ Examples:
   journal list --since yesterday              # natural language works too; ISO is preferred
   journal read                                # the last 7 days, as prose, oldest first
   journal read --since 2026-09-01 --tag work  # any range or filter; pages through $PAGER
+  journal show last                           # also: today, or any unique prefix like 2026-09-30
+  journal edit                                # pick an entry with fzf (or edit the last one)
   journal show 2026-09-30T164608
   journal search "coffee" --tag morning
   journal search --tag work                  # tag filter alone, no text query
@@ -171,7 +173,51 @@ def cmd_list(args: argparse.Namespace) -> int:
     return 0
 
 
+def _pick_entry() -> str | None:
+    """Choose an entry with fzf, if it's installed and we're on a terminal; else None."""
+    if not (sys.stdin.isatty() and sys.stdout.isatty() and shutil.which("fzf")):
+        return None
+    lines = [f"{e.id}  [{e.source}]  {_preview(e, 70)}" for e in store.list_entries()]
+    if not lines:
+        return None
+    picked = subprocess.run(
+        ["fzf", "--preview", "journal show --no-pager {1}", "--preview-window", "right,60%,wrap"],
+        input="\n".join(lines),
+        stdout=subprocess.PIPE,
+        text=True,
+    ).stdout.split()
+    return picked[0] if picked else ""
+
+
+def _resolve_args(args: argparse.Namespace, *, may_pick: bool = False) -> int | None:
+    """Replace args.id (an id, `last`, `today`, a unique prefix, or None) with the real id.
+
+    Returns None on success, or the exit code to return after printing the problem.
+    """
+    ref = args.id
+    if ref is None:
+        picked = _pick_entry() if may_pick else None
+        if picked == "":
+            return 1  # fzf cancelled
+        ref = picked or "last"
+        if picked is None:
+            print("journal: no id given, using the last entry", file=sys.stderr)
+    try:
+        args.id = store.resolve(ref)
+    except store.AmbiguousEntryError as exc:
+        print(f"journal: {ref!r} matches {len(exc.candidates)} entries:", file=sys.stderr)
+        for candidate in exc.candidates[:10]:
+            print(f"  {candidate}", file=sys.stderr)
+        return 1
+    except store.EntryNotFoundError:
+        print(f"journal: no entry {ref!r}", file=sys.stderr)
+        return 2
+    return None
+
+
 def cmd_show(args: argparse.Namespace) -> int:
+    if (code := _resolve_args(args, may_pick=True)) is not None:
+        return code
     try:
         entry = store.get(args.id)
     except store.EntryNotFoundError:
@@ -305,6 +351,8 @@ def cmd_tags(args: argparse.Namespace) -> int:
 
 
 def cmd_tag(args: argparse.Namespace) -> int:
+    if (code := _resolve_args(args)) is not None:
+        return code
     try:
         entry = store.add_tags(args.id, args.tags)
     except store.EntryNotFoundError:
@@ -318,6 +366,8 @@ def cmd_tag(args: argparse.Namespace) -> int:
 
 
 def cmd_delete(args: argparse.Namespace) -> int:
+    if (code := _resolve_args(args)) is not None:
+        return code
     try:
         trashed = store.delete(args.id)
     except store.EntryNotFoundError:
@@ -342,6 +392,8 @@ def _editor_command() -> list[str]:
 
 
 def cmd_edit(args: argparse.Namespace) -> int:
+    if (code := _resolve_args(args, may_pick=True)) is not None:
+        return code
     try:
         entry = store.get(args.id)
     except store.EntryNotFoundError:
@@ -518,7 +570,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_read.set_defaults(func=cmd_read)
 
     p_show = sub.add_parser("show", help="print a full entry")
-    p_show.add_argument("id")
+    p_show.add_argument("id", nargs="?", help="id, `last`, `today`, or a unique prefix; omit to pick with fzf")
     p_show.add_argument("--json", action="store_true")
     p_show.add_argument("--raw", action="store_true", help="print the file as stored, frontmatter included")
     p_show.add_argument("--no-pager", action="store_true")
@@ -554,18 +606,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_tags.set_defaults(func=cmd_tags)
 
     p_tag = sub.add_parser("tag", help="append missing #tags to an entry's body")
-    p_tag.add_argument("id")
+    p_tag.add_argument("id", help="id, `last`, `today`, or a unique prefix")
     p_tag.add_argument("tags", nargs="+")
     p_tag.add_argument("--json", action="store_true")
     p_tag.set_defaults(func=cmd_tag)
 
     p_delete = sub.add_parser("delete", help="move an entry to .trash under the data dir (not permanent)")
-    p_delete.add_argument("id")
+    p_delete.add_argument("id", help="id, `today`, `last`, or a unique prefix")
     p_delete.add_argument("--json", action="store_true")
     p_delete.set_defaults(func=cmd_delete)
 
     p_edit = sub.add_parser("edit", help="open an entry in $EDITOR (falls back to nvim, vim, then vi)")
-    p_edit.add_argument("id")
+    p_edit.add_argument("id", nargs="?", help="id, `last`, `today`, or a unique prefix; omit to pick with fzf")
     p_edit.set_defaults(func=cmd_edit)
 
     p_path = sub.add_parser("path", help="print the data directory")

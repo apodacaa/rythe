@@ -72,6 +72,34 @@ def _find_path(entry_id: str) -> Path | None:
     return None
 
 
+class AmbiguousEntryError(Exception):
+    def __init__(self, ref: str, candidates: list[str]):
+        super().__init__(f"{ref!r} matches {len(candidates)} entries")
+        self.ref = ref
+        self.candidates = candidates
+
+
+def resolve(ref: str) -> str:
+    """Turn what a person typed into an entry id: an exact id, `last` (newest entry), `today`
+    (newest entry written today), or a unique left-anchored prefix such as `2026-09-30`.
+    """
+    if _find_path(ref) is not None:
+        return ref
+    if ref in ("last", "today"):
+        found = list_entries(on=datetime.now().astimezone().date() if ref == "today" else None, limit=1)
+        if found:
+            return found[0].id
+        raise EntryNotFoundError(ref)
+    root = entries_root()
+    ids = sorted(p.stem for p in root.rglob(f"{ref}*.txt")) if root.exists() and ref else []
+    ids = [i for i in ids if i.startswith(ref)]
+    if len(ids) == 1:
+        return ids[0]
+    if ids:
+        raise AmbiguousEntryError(ref, ids)
+    raise EntryNotFoundError(ref)
+
+
 def _unique_id(created: datetime) -> str:
     base = id_for(created)
     candidate = base

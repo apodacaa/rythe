@@ -501,3 +501,61 @@ def test_failed_save_keeps_the_draft_and_the_next_write_resumes_it(capsys, monke
     assert "resuming an unsaved draft" in captured.err
     assert json.loads(captured.out)["body"].strip() == "precious words"
     assert store.list_drafts() == []
+
+
+def _make(at, body="x"):
+    main(["new", "--at", at, "--text", body, "--json"])
+
+
+def test_show_accepts_last_today_and_unique_prefix(capsys):
+    _make("2026-09-30T08:00:00+02:00", "older")
+    _make("2026-10-01T09:00:00+02:00", "newer")
+    capsys.readouterr()
+
+    for ref, expected in (("last", "newer"), ("2026-09-30", "older"), ("2026-10-01T0900", "newer")):
+        assert main(["show", ref, "--json"]) == 0
+        assert json.loads(capsys.readouterr().out)["body"].strip() == expected
+
+
+def test_today_ref_means_newest_entry_written_today(capsys):
+    _make("2026-09-30T08:00:00+02:00")
+    capsys.readouterr()
+    assert main(["show", "today"]) == 2  # nothing written today
+
+
+def test_ambiguous_prefix_lists_candidates_and_exits_1(capsys):
+    _make("2026-09-30T08:00:00+02:00")
+    _make("2026-09-30T09:00:00+02:00")
+    capsys.readouterr()
+
+    assert main(["show", "2026-09-30"]) == 1
+    err = capsys.readouterr().err
+    assert "matches 2 entries" in err and "2026-09-30T080000" in err and "2026-09-30T090000" in err
+
+
+def test_unknown_ref_exits_2_and_empty_journal_has_no_last(capsys):
+    assert main(["show", "last"]) == 2
+    assert main(["delete", "2026-01"]) == 2
+
+
+def test_edit_without_id_edits_the_last_entry(monkeypatch, capsys):
+    _make("2026-09-30T08:00:00+02:00", "old")
+    _make("2026-10-01T09:00:00+02:00", "new")
+    capsys.readouterr()
+    monkeypatch.setattr("journal.cli.shutil.which", lambda name: None)  # no fzf
+    monkeypatch.setattr(
+        "journal.cli.subprocess.call", lambda command: Path(command[-1]).write_text("new, revised\n")
+    )
+
+    assert main(["edit"]) == 0
+    captured = capsys.readouterr()
+    assert "using the last entry" in captured.err
+    main(["show", "last", "--json"])
+    assert json.loads(capsys.readouterr().out)["body"].strip() == "new, revised"
+
+
+def test_tag_and_delete_accept_refs(capsys):
+    _make("2026-09-30T08:00:00+02:00")
+    capsys.readouterr()
+    assert main(["tag", "last", "x"]) == 0
+    assert main(["delete", "2026-09-30"]) == 0
