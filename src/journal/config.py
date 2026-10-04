@@ -39,6 +39,7 @@ class Config:
     memo: MemoConfig = field(default_factory=MemoConfig)
     history: HistoryConfig = field(default_factory=HistoryConfig)
     resurface: ResurfaceConfig = field(default_factory=ResurfaceConfig)
+    prompts: dict[str, list[str]] = field(default_factory=dict)
 
 
 def load_config() -> Config:
@@ -54,4 +55,5 @@ def load_config() -> Config:
         memo=MemoConfig(**raw.get("memo", {})),
         history=HistoryConfig(**raw.get("history", {})),
         resurface=ResurfaceConfig(**raw.get("resurface", {})),
+        prompts={name: list(items) for name, items in raw.get("prompts", {}).items()},
     )

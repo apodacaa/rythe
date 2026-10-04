@@ -3,6 +3,7 @@
 Examples:
   journal new --text "Had a good day #gratitude"
   journal add had coffee with Sam -t friends   # one-line capture; -t because shells eat '#'
+  journal write --prompt hard                 # opt-in prompt below the page: today (default), hard, distance
   journal new --editor                        # compose in $EDITOR instead
   echo "typed from a script" | journal new --source cli
   journal list --since 2026-09-01 --tag work
@@ -45,7 +46,7 @@ import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import ingest, render, store, transcribe
+from . import ingest, prompts, render, store, transcribe
 from .config import load_config
 from .dates import (
     parse_date as _parse_date,
@@ -88,7 +89,7 @@ def _preview(entry: Entry, length: int = 50) -> str:
     return collapsed
 
 
-def _compose_in_editor() -> tuple[str, Path] | None:
+def _compose_in_editor(prompt: str | None = None) -> tuple[str, Path] | None:
     """Open $EDITOR on a draft kept under the data dir; returns (body, draft path), or None if
     the draft came back empty.
 
@@ -103,9 +104,9 @@ def _compose_in_editor() -> tuple[str, Path] | None:
         print(f"journal: resuming an unsaved draft from {stamp}", file=sys.stderr)
     else:
         path = store.new_draft_path()
-        path.touch()
+        path.write_text(prompts.draft_text(prompt) if prompt else "")
     subprocess.call(_editor_command() + [str(path)])
-    body = path.read_text()
+    body = prompts.strip_scissors(path.read_text())
     if not body.strip():
         path.unlink(missing_ok=True)
         return None
@@ -129,9 +130,15 @@ def _print_resurfaced(entry: Entry) -> None:
 def cmd_new(args: argparse.Namespace) -> int:
     # Parse --at first: a bad date must fail before the user has typed a word.
     created = _parse_when(args.at) if args.at else _now()
+    prompt = None
+    if args.prompt:
+        if not args.editor:
+            print("journal: --prompt only applies when composing in the editor", file=sys.stderr)
+            return 1
+        prompt = prompts.pick(args.prompt, _now().date(), load_config().prompts)
     draft = None
     if args.editor:
-        composed = _compose_in_editor()
+        composed = _compose_in_editor(prompt)
         if composed is None:
             print("journal: no entry created (empty)", file=sys.stderr)
             return 1
@@ -173,7 +180,7 @@ def cmd_add(args: argparse.Namespace) -> int:
         body = body.rstrip("\n") + "\n" + " ".join(f"#{t}" for t in missing) + "\n"
     return cmd_new(
         argparse.Namespace(
-            at=args.at, title="", source="cli", text=body, editor=False, json=args.json
+            at=args.at, title="", source="cli", text=body, editor=False, prompt=None, json=args.json
         )
     )
 
@@ -584,7 +591,8 @@ def cmd_model_list(args: argparse.Namespace) -> int:
 
 
 def cmd_write(args: argparse.Namespace) -> int:
-    return main(["new", "--editor"])
+    prompt = getattr(args, "prompt", None)
+    return main(["new", "--editor"] + (["--prompt", prompt] if prompt else []))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -603,6 +611,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_new.add_argument("--text", help="entry body; reads stdin if omitted")
     p_new.add_argument(
         "-e", "--editor", action="store_true", help="compose in $EDITOR instead of --text/stdin"
+    )
+    p_new.add_argument(
+        "--prompt",
+        nargs="?",
+        const="today",
+        metavar="SET",
+        help="show a writing prompt below the page (removed on save); sets: today, hard, distance, or your own in config",
     )
     p_new.add_argument("--json", action="store_true")
     p_new.set_defaults(func=cmd_new)
@@ -750,6 +765,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_write = sub.add_parser(
         "write", help="open $EDITOR on a new entry (default with no command); same as `journal new --editor`"
+    )
+    p_write.add_argument(
+        "--prompt",
+        nargs="?",
+        const="today",
+        metavar="SET",
+        help="show a writing prompt below the page (removed on save); sets: today, hard, distance, or your own in config",
     )
     p_write.set_defaults(func=cmd_write)
 
