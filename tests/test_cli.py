@@ -623,3 +623,16 @@ def test_status_plain_output(capsys):
     main(["status"])
     out = capsys.readouterr().out
     assert "last entry: 3 days ago" in out and "this week: 1 entry" in out
+
+
+def test_help_documents_new_behaviour(capsys):
+    def help_of(*argv):
+        with pytest.raises(SystemExit):
+            main([*argv, "--help"])
+        return " ".join(capsys.readouterr().out.split())
+
+    assert "[history]" in help_of() and "[prompts]" in help_of()
+    assert "frontmatter" in help_of("edit") and "fzf" in help_of("edit")
+    assert "--raw" in help_of("show") or "raw" in help_of("show")
+    assert "on_this_day_count" in help_of("status")
+    assert "review" in help_of("write") and "#review" in help_of("review")
