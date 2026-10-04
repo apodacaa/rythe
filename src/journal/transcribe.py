@@ -20,6 +20,31 @@ KNOWN_MODELS = {
     "medium": "ggml-medium.bin",
     "large": "ggml-large-v3.bin",
 }
+# Approximate download sizes in MB, for showing people what they're about to fetch.
+MODEL_SIZES_MB = {"tiny": 75, "base": 142, "small": 466, "medium": 1500, "large": 2900}
+
+
+def format_size(name: str) -> str:
+    mb = MODEL_SIZES_MB[name]
+    return f"~{mb / 1000:.1f} GB" if mb >= 1000 else f"~{round(mb, -1) if mb >= 100 else mb} MB"
+
+
+def progress_printer(label: str) -> Callable[[int, int], None]:
+    """A download progress callback that rewrites one status line on stderr."""
+    import sys
+
+    def progress(downloaded: int, total: int) -> None:
+        if total:
+            pct = downloaded * 100 // total
+            print(
+                f"\rdownloading {label}: {pct}% ({downloaded // (1024 * 1024)} / {total // (1024 * 1024)} MB)",
+                end="",
+                file=sys.stderr,
+            )
+
+    return progress
+
+
 _MODEL_BASE_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main"
 
 
@@ -39,7 +64,12 @@ def model_path(name: str) -> Path:
 
 def list_models() -> list[dict]:
     return [
-        {"name": name, "file": filename, "downloaded": (models_dir() / filename).exists()}
+        {
+            "name": name,
+            "file": filename,
+            "downloaded": (models_dir() / filename).exists(),
+            "approx_mb": MODEL_SIZES_MB[name],
+        }
         for name, filename in KNOWN_MODELS.items()
     ]
 

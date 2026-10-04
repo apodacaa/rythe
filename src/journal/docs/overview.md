@@ -30,6 +30,8 @@ There are two front doors onto the same data:
 
 Run `journal docs --list` for all topics. The usual path:
 
+0. `journal setup`: a short guided setup for people (re-runnable; nothing is saved until you
+   confirm). `journal setup --check [--json]` reports what the machine has, for anyone.
 1. `journal docs concepts`: ids, tags, time zones, drafts, history, the data layout.
 2. `journal docs commands`: every command and flag (generated from the CLI itself).
 3. `journal docs config`: every setting, what it does, and how to change it.

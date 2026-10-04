@@ -53,8 +53,8 @@ import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import configcmd, docs, ingest, prompts, render, store, transcribe
-from .config import load_config
+from . import configcmd, docs, ingest, prompts, render, setup, store, transcribe
+from .config import config_path, load_config
 from .dates import (
     parse_date as _parse_date,
     parse_datetime as _parse_when,
@@ -140,6 +140,14 @@ def _print_resurfaced(entry: Entry) -> None:
         print(f"{label}: {_preview(old, 70)}   (journal show {old.id})")
 
 
+def _print_setup_tip() -> None:
+    """After the very first entry, and only while there's no config file yet (running `journal
+    setup` or any `config set` creates it), point at the guided setup once. Stateless on purpose.
+    """
+    if store.count_entries() == 1 and not config_path().exists():
+        print("tip: `journal setup` walks you through the options (folder, history, voice memos).")
+
+
 def cmd_new(args: argparse.Namespace) -> int:
     # Parse --at first: a bad date must fail before the user has typed a word.
     created = _parse_when(args.at) if args.at else _now()
@@ -173,6 +181,7 @@ def cmd_new(args: argparse.Namespace) -> int:
         print(f"created {entry.id}")
         if _interactive():
             _print_resurfaced(entry)
+            _print_setup_tip()
     return 0
 
 
@@ -457,6 +466,28 @@ def cmd_review(args: argparse.Namespace) -> int:
     )
 
 
+def cmd_setup(args: argparse.Namespace) -> int:
+    if args.check:
+        report = setup.environment_report()
+        if args.json:
+            print(json.dumps(report, indent=2, ensure_ascii=False))
+        else:
+            print(setup.render_report(report))
+        return 0
+    if args.json:
+        print("journal: --json goes with --check", file=sys.stderr)
+        return 1
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        print(
+            "journal: setup is interactive and needs a terminal. For scripts and agents: "
+            "`journal setup --check --json` reports the environment and `journal config set` "
+            "changes settings.",
+            file=sys.stderr,
+        )
+        return 1
+    return setup.run_wizard(start_entry=lambda: cmd_write(argparse.Namespace()))
+
+
 def cmd_tags(args: argparse.Namespace) -> int:
     counts = store.tag_counts(
         since=_parse_since(args.since) if args.since else None,
@@ -612,15 +643,10 @@ def cmd_ingest_seen(args: argparse.Namespace) -> int:
 
 
 def cmd_model_download(args: argparse.Namespace) -> int:
-    def progress(downloaded: int, total: int) -> None:
-        if total:
-            pct = downloaded * 100 // total
-            mb = downloaded // (1024 * 1024)
-            total_mb = total // (1024 * 1024)
-            print(f"\rdownloading {args.name}: {pct}% ({mb} / {total_mb} MB)", end="", file=sys.stderr)
-
     try:
-        path = transcribe.download_model(args.name, force=args.force, progress=progress)
+        path = transcribe.download_model(
+            args.name, force=args.force, progress=transcribe.progress_printer(args.name)
+        )
     except transcribe.TranscribeError as exc:
         print(f"\njournal: {exc}", file=sys.stderr)
         return 1
@@ -637,7 +663,7 @@ def cmd_model_list(args: argparse.Namespace) -> int:
     else:
         for m in models:
             mark = "x" if m["downloaded"] else " "
-            print(f"[{mark}] {m['name']:8} {m['file']}")
+            print(f"[{mark}] {m['name']:8} {m['file']}  {transcribe.format_size(m['name'])}")
     return 0
 
 
@@ -866,6 +892,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_docs.add_argument("--all", action="store_true", help="print every topic")
     p_docs.add_argument("--json", action="store_true")
     p_docs.set_defaults(func=docs.cmd_docs)
+
+    p_setup = sub.add_parser(
+        "setup",
+        help="a short guided setup, or --check to see what this machine has",
+        description=(
+            "Walk through the few choices that matter (journal folder, history, resurfacing, "
+            "voice memos). Safe to re-run: nothing is saved until you confirm. --check reports "
+            "which tools are available and what each enables, without asking anything."
+        ),
+    )
+    p_setup.add_argument("--check", action="store_true", help="report the environment only; ask nothing")
+    p_setup.add_argument("--json", action="store_true", help="with --check: machine-readable report")
+    p_setup.set_defaults(func=cmd_setup)
 
     p_tags = sub.add_parser("tags", help="tag counts across entries")
     p_tags.add_argument("--since", metavar="ISO")

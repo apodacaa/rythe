@@ -41,7 +41,14 @@ voice memos.
 
 ## Getting started
 
-There's nothing to set up: the first `journal` or `journal add` creates the folders it needs.
+There's nothing you have to set up: the first `journal` or `journal add` creates the folders it
+needs. If you'd like a guided tour of the few choices that matter (where the journal lives, history,
+voice memos), run:
+
+```
+journal setup                        # a short, re-runnable wizard; nothing is saved until you confirm
+journal setup --check                # just report what this machine has (editor, git, fzf, ffmpeg…)
+```
 
 | What | Default location | Change it |
 |---|---|---|
