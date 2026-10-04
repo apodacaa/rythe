@@ -31,6 +31,11 @@ get swept in on demand via the `journal-sweep` skill, which transcribes locally 
   `DESCRIPTIONS` entry; a new command needs a `help=` (and flags need help text). Static guide
   pages are `src/journal/docs/*.md` (overview, concepts, json, agents): update them when
   behaviour changes. `journal docs --all` is the agent guide; the README is the human one.
+- **The setup wizard is a thin layer.** `journal setup` (interactive, people only) asks about the
+  settings in `setup.WIZARD_KEYS` and saves through the same validation and writer as
+  `journal config set`; `journal setup --check --json` is the agent-friendly equivalent. It never
+  launches on its own: the only nudge is a one-line tip after a person's first entry while no
+  config file exists. New wizard questions must use registry settings (a test checks).
 - **A bare `journal` is a blank page.** Prompts are always opt-in (`--prompt`).
 - **Never lose writing.** Editor drafts live in `<data>/drafts` until the entry is saved;
   `--at` is parsed before the editor opens; edits show the editor only the body.

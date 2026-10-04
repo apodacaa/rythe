@@ -54,7 +54,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from . import configcmd, docs, ingest, prompts, render, setup, store, transcribe
-from .config import load_config
+from .config import config_path, load_config
 from .dates import (
     parse_date as _parse_date,
     parse_datetime as _parse_when,
@@ -140,6 +140,14 @@ def _print_resurfaced(entry: Entry) -> None:
         print(f"{label}: {_preview(old, 70)}   (journal show {old.id})")
 
 
+def _print_setup_tip() -> None:
+    """After the very first entry, and only while there's no config file yet (running `journal
+    setup` or any `config set` creates it), point at the guided setup once. Stateless on purpose.
+    """
+    if store.count_entries() == 1 and not config_path().exists():
+        print("tip: `journal setup` walks you through the options (folder, history, voice memos).")
+
+
 def cmd_new(args: argparse.Namespace) -> int:
     # Parse --at first: a bad date must fail before the user has typed a word.
     created = _parse_when(args.at) if args.at else _now()
@@ -173,6 +181,7 @@ def cmd_new(args: argparse.Namespace) -> int:
         print(f"created {entry.id}")
         if _interactive():
             _print_resurfaced(entry)
+            _print_setup_tip()
     return 0
 
 

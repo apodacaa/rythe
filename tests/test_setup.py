@@ -250,3 +250,37 @@ def test_saying_no_to_voice_memos_asks_nothing_more(home):
     s = Session("", "", "", "", "")
     s.run()
     assert not any("Which model" in p for p in s.prompts)
+
+
+def test_first_entry_gets_a_one_time_setup_tip(capsys, monkeypatch):
+    monkeypatch.setattr("journal.cli._interactive", lambda: True)
+
+    main(["add", "my first entry"])
+    assert "journal setup" in capsys.readouterr().out
+
+    main(["add", "my second entry"])
+    assert "journal setup" not in capsys.readouterr().out
+
+
+def test_no_tip_once_a_config_file_exists_or_with_json_or_when_piped(capsys, monkeypatch):
+    monkeypatch.setattr("journal.cli._interactive", lambda: True)
+    main(["config", "set", "history.enabled", "true"])  # creates the config file
+    capsys.readouterr()
+    main(["add", "first, but configured"])
+    assert "journal setup" not in capsys.readouterr().out
+
+
+def test_no_tip_with_json_or_non_terminal(capsys, monkeypatch):
+    monkeypatch.setattr("journal.cli._interactive", lambda: True)
+    main(["add", "x", "--json"])
+    assert "journal setup" not in capsys.readouterr().out
+
+
+def test_docs_describe_setup_for_people_and_agents():
+    from journal import docs
+
+    assert "journal setup" in docs.render_topic("overview")
+    assert "journal setup --check" in docs.render_topic("agents")
+    json_doc = docs.render_topic("json")
+    for key in setup.environment_report():
+        assert f'"{key}"' in json_doc, key
