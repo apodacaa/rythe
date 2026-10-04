@@ -24,9 +24,15 @@ class MemoConfig:
 
 
 @dataclass
+class HistoryConfig:
+    enabled: bool = True
+
+
+@dataclass
 class Config:
     transcribe: TranscribeConfig = field(default_factory=TranscribeConfig)
     memo: MemoConfig = field(default_factory=MemoConfig)
+    history: HistoryConfig = field(default_factory=HistoryConfig)
 
 
 def load_config() -> Config:
@@ -40,4 +46,5 @@ def load_config() -> Config:
     return Config(
         transcribe=TranscribeConfig(**raw.get("transcribe", {})),
         memo=MemoConfig(**raw.get("memo", {})),
+        history=HistoryConfig(**raw.get("history", {})),
     )
