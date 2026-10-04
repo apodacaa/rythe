@@ -583,3 +583,43 @@ def test_add_reads_stdin_without_words_and_refuses_empty(monkeypatch, capsys):
 
     monkeypatch.setattr("sys.stdin", io.StringIO("  \n"))
     assert main(["add"]) == 1
+
+
+def test_status_empty_journal(capsys):
+    assert main(["status"]) == 0
+    assert capsys.readouterr().out.strip() == "no entries yet"
+    assert main(["status", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out) == {
+        "last_entry_id": None,
+        "last_entry_at": None,
+        "days_since": None,
+        "week_count": 0,
+        "on_this_day_count": 0,
+    }
+
+
+def test_status_reports_last_entry_week_count_and_on_this_day(capsys):
+    from datetime import datetime, timedelta, timezone
+
+    from journal.cli import _status
+
+    now = datetime(2026, 10, 4, 12, tzinfo=timezone.utc)
+    for at in ("2026-10-01T08:00:00+00:00", "2026-09-10T08:00:00+00:00", "2025-10-04T08:00:00+00:00"):
+        main(["new", "--at", at, "--text", "x"])
+    capsys.readouterr()
+
+    status = _status(now)
+    assert status["last_entry_id"] == "2026-10-01T080000"
+    assert status["days_since"] == 3
+    assert status["week_count"] == 1
+    assert status["on_this_day_count"] == 1
+
+
+def test_status_plain_output(capsys):
+    from datetime import datetime, timedelta
+
+    main(["new", "--at", (datetime.now().astimezone() - timedelta(days=3)).isoformat(), "--text", "x"])
+    capsys.readouterr()
+    main(["status"])
+    out = capsys.readouterr().out
+    assert "last entry: 3 days ago" in out and "this week: 1 entry" in out

@@ -16,6 +16,7 @@ Examples:
   journal search --tag work                  # tag filter alone, no text query
   journal list --on 2026-09-30
   journal list --untagged
+  journal status                              # last entry, entries this week; also --json
   journal on-this-day                        # entries from today's date in any past year
   journal on-this-day --date monday           # bare weekday names work; "last monday" doesn't
   journal tags
@@ -361,6 +362,43 @@ def cmd_search(args: argparse.Namespace) -> int:
     return 0
 
 
+def _status(now: datetime) -> dict:
+    today = now.date()
+    entries = store.list_entries()  # newest first
+    last = entries[0] if entries else None
+    week_start = today - timedelta(days=6)
+    return {
+        "last_entry_id": last.id if last else None,
+        "last_entry_at": last.created.isoformat() if last else None,
+        "days_since": (today - last.created.date()).days if last else None,
+        "week_count": sum(1 for e in entries if e.created.date() >= week_start),
+        "on_this_day_count": sum(
+            1
+            for e in entries
+            if (e.created.month, e.created.day) == (today.month, today.day) and e.created.year < today.year
+        ),
+    }
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    status = _status(_now())
+    if args.json:
+        print(json.dumps(status, indent=2))
+        return 0
+    if status["last_entry_id"] is None:
+        print("no entries yet")
+        return 0
+    days = status["days_since"]
+    when = "today" if days == 0 else "yesterday" if days == 1 else f"{days} days ago"
+    last = datetime.fromisoformat(status["last_entry_at"])
+    n = status["week_count"]
+    print(f"last entry: {when} ({last:%a %b} {last.day})")
+    print(f"this week: {n} {'entry' if n == 1 else 'entries'}")
+    if status["on_this_day_count"]:
+        print(f"on this day: {status['on_this_day_count']} from past years")
+    return 0
+
+
 def cmd_tags(args: argparse.Namespace) -> int:
     counts = store.tag_counts(
         since=_parse_since(args.since) if args.since else None,
@@ -637,6 +675,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_otd.add_argument("--source", choices=["cli", "memo", "text"])
     p_otd.add_argument("--json", action="store_true")
     p_otd.set_defaults(func=cmd_on_this_day)
+
+    p_status = sub.add_parser(
+        "status",
+        help="when you last wrote, and how this week is going (for prompts, status bars, schedulers)",
+    )
+    p_status.add_argument("--json", action="store_true")
+    p_status.set_defaults(func=cmd_status)
 
     p_tags = sub.add_parser("tags", help="tag counts across entries")
     p_tags.add_argument("--since", metavar="ISO")
