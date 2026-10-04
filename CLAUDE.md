@@ -12,7 +12,8 @@ A personal, date/time-based journal. Two front doors onto the same data:
 
 Voice memos arrive by email (subject `record-memo: <ISO timestamp>`, one audio attachment) and
 get swept in on demand via the `journal-sweep` skill, which transcribes locally with
-`whisper-cpp` and calls `journal ingest audio`.
+`whisper-cpp` and calls `journal ingest audio`. That skill lives globally in
+`~/.claude/skills/journal-sweep`, not in this repo — it's a client of the CLI.
 
 ## Design rules
 
@@ -54,6 +55,5 @@ in `~/.config/journal/config.toml` turns that off). It is never pushed anywhere.
 - Install/reinstall after code changes: `uv tool install --editable .` (puts `journal` on
   `~/.local/bin`, which is already on PATH — this project's own `bin/` is not used).
 - Tests: `uv run pytest`.
-- Install the email-sweep skill: symlink `skills/journal-sweep` into `~/.claude/skills/`.
 - Git: local only for now, no GitHub remote. Work on a branch per milestone; the user decides
   when to merge. Don't commit straight to `main`.
