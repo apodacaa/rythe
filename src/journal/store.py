@@ -38,6 +38,21 @@ def audio_root() -> Path:
     return data_dir() / "audio"
 
 
+def drafts_root() -> Path:
+    return data_dir() / "drafts"
+
+
+def list_drafts() -> list[Path]:
+    """Unsaved editor drafts left behind by an interrupted write, oldest first."""
+    root = drafts_root()
+    return sorted(root.glob("*.txt")) if root.exists() else []
+
+
+def new_draft_path() -> Path:
+    drafts_root().mkdir(parents=True, exist_ok=True)
+    return drafts_root() / f"{datetime.now().strftime('%Y%m%dT%H%M%S%f')}.txt"
+
+
 def _entry_path(entry_id: str) -> Path:
     year, month = entry_id[:4], entry_id[5:7]
     return entries_root() / year / month / f"{entry_id}.txt"

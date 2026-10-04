@@ -35,7 +35,6 @@ import shlex
 import shutil
 import subprocess
 import sys
-import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -81,27 +80,49 @@ def _preview(entry: Entry, length: int = 50) -> str:
     return collapsed
 
 
+def _compose_in_editor() -> tuple[str, Path] | None:
+    """Open $EDITOR on a draft kept under the data dir; returns (body, draft path), or None if
+    the draft came back empty.
+
+    The draft lives on disk until the caller has saved the entry and unlinked it, so a
+    crash, a killed editor or a failed save never loses what was typed — the next write
+    resumes it.
+    """
+    leftovers = store.list_drafts()
+    if leftovers:
+        path = leftovers[0]
+        stamp = datetime.fromtimestamp(path.stat().st_mtime).strftime("%a %b %-d, %-I:%M %p")
+        print(f"journal: resuming an unsaved draft from {stamp}", file=sys.stderr)
+    else:
+        path = store.new_draft_path()
+        path.touch()
+    subprocess.call(_editor_command() + [str(path)])
+    body = path.read_text()
+    if not body.strip():
+        path.unlink(missing_ok=True)
+        return None
+    return body, path
+
+
 def cmd_new(args: argparse.Namespace) -> int:
+    # Parse --at first: a bad date must fail before the user has typed a word.
+    created = _parse_when(args.at) if args.at else _now()
+    draft = None
     if args.editor:
-        fd, tmp_name = tempfile.mkstemp(suffix=".txt", prefix="journal-new-")
-        os.close(fd)
-        tmp_path = Path(tmp_name)
-        try:
-            subprocess.call(_editor_command() + [str(tmp_path)])
-            body = tmp_path.read_text()
-        finally:
-            tmp_path.unlink(missing_ok=True)
-        if not body.strip():
+        composed = _compose_in_editor()
+        if composed is None:
             print("journal: no entry created (empty)", file=sys.stderr)
             return 1
+        body, draft = composed
     elif args.text is None:
         if sys.stdin.isatty():
             print("(type your entry, then Ctrl-D to save, or Ctrl-C to abort)", file=sys.stderr)
         body = sys.stdin.read()
     else:
         body = args.text
-    created = _parse_when(args.at) if args.at else _now()
     entry = store.create(created=created, body=body, source=args.source, title=args.title or "")
+    if draft is not None:
+        draft.unlink(missing_ok=True)
     if args.json:
         print(json.dumps(_entry_to_dict(entry), indent=2))
     else:

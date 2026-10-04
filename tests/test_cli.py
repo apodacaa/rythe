@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from journal import transcribe
+from journal import store, transcribe
 from journal.cli import main
 
 
@@ -467,3 +467,42 @@ def test_edit_reports_corruption_without_reverting(monkeypatch, capsys, journal_
     assert main(["edit", entry_id]) == 1
     err = capsys.readouterr().err
     assert "may be corrupted" in err
+
+
+def test_new_bad_at_fails_before_opening_the_editor(capsys, monkeypatch, journal_dir):
+    calls = []
+    monkeypatch.setattr("journal.cli.subprocess.call", lambda command: calls.append(command))
+
+    assert main(["new", "--editor", "--at", "next blursday"]) == 1
+    assert calls == []
+
+
+def test_failed_save_keeps_the_draft_and_the_next_write_resumes_it(capsys, monkeypatch, journal_dir):
+    monkeypatch.setattr(
+        "journal.cli.subprocess.call",
+        lambda command: Path(command[-1]).write_text("precious words\n"),
+    )
+
+    def boom(**kwargs):
+        raise OSError("disk full")
+
+    real_create = store.create
+    monkeypatch.setattr("journal.cli.store.create", boom)
+    with pytest.raises(OSError):
+        main(["new", "--editor"])
+    assert len(store.list_drafts()) == 1
+
+    monkeypatch.setattr("journal.cli.store.create", real_create)
+    seen = []
+
+    def resume(command):
+        seen.append(Path(command[-1]).read_text())
+        return 0
+
+    monkeypatch.setattr("journal.cli.subprocess.call", resume)
+    assert main(["new", "--editor", "--json"]) == 0
+    captured = capsys.readouterr()
+    assert seen == ["precious words\n"]
+    assert "resuming an unsaved draft" in captured.err
+    assert json.loads(captured.out)["body"].strip() == "precious words"
+    assert store.list_drafts() == []
