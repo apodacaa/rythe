@@ -86,3 +86,56 @@ def test_json_output_is_never_styled_even_with_color_forced(capsys, monkeypatch)
     assert "\x1b" not in out and json.loads(out)["tags"] == ["x"]
     main(["config", "list", "--json"])
     assert "\x1b" not in capsys.readouterr().out
+
+
+COMMANDS = [
+    ["list"],
+    ["list", "--tag", "work"],
+    ["search", "coffee"],
+    ["search", "co+", "--regex"],
+    ["on-this-day", "--date", "2025-10-04"],
+    ["tags"],
+    ["status"],
+    ["model", "list"],
+    ["config", "list"],
+    ["config", "explain", "history.enabled"],
+    ["config", "explain"],
+    ["prompts", "list"],
+    ["prompts", "show", "hard"],
+    ["setup", "--check"],
+]
+
+
+@pytest.fixture
+def seeded(capsys):
+    main(["new", "--at", "2025-10-04T09:00:00+02:00", "--text", "coffee and code #work", "--source", "memo"])
+    main(["new", "--at", "2026-10-03T21:30:00+02:00", "--title", "Late", "--text", "a coffee, again #home"])
+    main(["config", "set", "history.enabled", "false"])
+    capsys.readouterr()
+
+
+@pytest.mark.parametrize("argv", COMMANDS, ids=lambda a: " ".join(a))
+def test_styling_only_adds_escape_codes_never_changes_the_text(argv, seeded, capsys, monkeypatch):
+    assert main(argv) == 0
+    plain = capsys.readouterr().out
+    assert "\x1b" not in plain
+
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    assert main(argv) == 0
+    colored = capsys.readouterr().out
+    assert "\x1b[" in colored, f"{argv} printed no styling"
+    assert ui.strip_ansi(colored) == plain
+
+
+@pytest.mark.parametrize("argv", COMMANDS, ids=lambda a: " ".join(a))
+def test_no_color_env_and_never_setting_both_keep_output_plain(argv, seeded, capsys, monkeypatch):
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    monkeypatch.setenv("NO_COLOR", "1")
+    main(argv)
+    assert "\x1b" not in capsys.readouterr().out
+
+    monkeypatch.delenv("NO_COLOR")
+    main(["config", "set", "appearance.color", "never"])
+    capsys.readouterr()
+    main(argv)
+    assert "\x1b" not in capsys.readouterr().out

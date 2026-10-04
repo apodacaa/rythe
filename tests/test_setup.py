@@ -51,7 +51,9 @@ def test_check_counts_entries(capsys):
 def test_plain_check_output(capsys, monkeypatch):
     monkeypatch.setattr("journal.setup.shutil.which", lambda name: None if name == "fzf" else f"/usr/bin/{name}")
     out = run(capsys, "setup", "--check")[1]
-    assert "Your setup:" in out and "missing  fzf" in out and "ok       git" in out
+    assert "Your setup" in out
+    assert any("missing" in l and "fzf" in l for l in out.splitlines())
+    assert any(" ok " in l and "git" in l for l in out.splitlines())
     assert "journal folder:" in out and "not created yet" in out
 
 

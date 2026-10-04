@@ -104,17 +104,26 @@ def environment_report() -> dict:
 
 
 def render_report(report: dict) -> str:
-    lines = ["Your setup:"]
+    lines = [ui.rule("Your setup")]
     width = max(len(c["name"]) for c in report["checks"])
     for c in report["checks"]:
-        status = "ok     " if c["found"] else "missing"
-        detail = c["detail"] if c["found"] else c["hint"]
-        lines.append(f"  {status}  {c['name']:<{width}}  {detail}")
+        name = c["name"]
+        if c["found"]:
+            badge = ui.style(f"{ui.glyph('ok')} ok     ", "green")
+            detail = ui.style(c["detail"], "dim")
+        else:
+            badge = ui.style(f"{ui.glyph('bad')} missing", "yellow")
+            detail = ui.style(c["hint"], "yellow")
+        lines.append(f"  {badge}  {ui.style(f'{name:<{width}}', 'bold')}  {detail}")
     lines.append("")
-    lines.append(f"journal folder: {report['data_dir']} ({report['entries']} entries)")
+    entries = report["entries"]
     lines.append(
-        f"settings file:  {report['config_path']}"
-        + ("" if report["config_exists"] else " (not created yet; all defaults)")
+        f"{ui.style('journal folder:', 'bold')} {ui.style(report['data_dir'], 'cyan')} "
+        f"{ui.style(f'({entries} entries)', 'dim')}"
+    )
+    lines.append(
+        f"{ui.style('settings file: ', 'bold')} {ui.style(report['config_path'], 'cyan')}"
+        + ("" if report["config_exists"] else ui.style(" (not created yet; all defaults)", "dim"))
     )
     return "\n".join(lines)
 
