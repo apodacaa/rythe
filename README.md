@@ -39,6 +39,31 @@ Optional, each with a plain fallback if missing: `git` (history), `fzf` (an entr
 `journal edit` and `journal show`), a pager such as `less`, and `ffmpeg` plus `whisper-cpp` for
 voice memos.
 
+## Getting started
+
+There's nothing to set up: the first `journal` or `journal add` creates the folders it needs.
+
+| What | Default location | Change it |
+|---|---|---|
+| Your entries (plus audio, drafts, trash, git history) | `~/.local/share/journal` | `journal config set storage.dir ~/Documents/journal` |
+| Settings file | `~/.config/journal/config.toml` | the `JOURNAL_CONFIG` environment variable |
+
+Check where things are with `journal path` (the journal folder) and `journal config path` (the
+settings file).
+
+**Choosing a different folder:** do it before you start, or move your files along with it.
+`storage.dir` changes where the journal *looks*; it doesn't move anything. To relocate an existing
+journal:
+
+```
+mv ~/.local/share/journal ~/Documents/journal      # the whole folder, history included
+journal config set storage.dir ~/Documents/journal
+```
+
+The `JOURNAL_DIR` environment variable also works and takes precedence, but it only applies to
+programs started from a shell that exports it, so the setting is the safer choice. A good place
+for the folder is somewhere you already back up (a synced folder, for example).
+
 ## A quick tour
 
 **Write**
@@ -103,7 +128,7 @@ journal config unset history.enabled
 ```
 
 The file is `~/.config/journal/config.toml` (override with `JOURNAL_CONFIG`). Entries live in
-`~/.local/share/journal` (override with `JOURNAL_DIR`).
+`~/.local/share/journal` unless you set `storage.dir` (see [Getting started](#getting-started)).
 
 ## Voice memos
 
