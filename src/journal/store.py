@@ -1,4 +1,5 @@
-"""File-backed storage for journal entries under JOURNAL_DIR (default ~/.local/share/journal).
+"""File-backed storage for journal entries under the data directory (see `data_dir`: $JOURNAL_DIR,
+else the `storage.dir` setting, else ~/.local/share/journal).
 
 Tags are never indexed: every read scans the body with tags.extract_tags. At journal scale a
 full directory scan on every command is fast enough, and there is no index to keep in sync.
@@ -12,6 +13,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from . import history
+from .config import load_config
 from .entry import Entry, id_for
 from .tags import extract_tags, normalize_tag
 
@@ -27,9 +29,16 @@ class DuplicateMessageError(Exception):
         self.existing_id = existing_id
 
 
+DEFAULT_DATA_DIR = "~/.local/share/journal"
+
+
 def data_dir() -> Path:
+    """Where entries live: $JOURNAL_DIR, else the `storage.dir` setting, else the default."""
     override = os.environ.get("JOURNAL_DIR")
-    return Path(override) if override else Path.home() / ".local/share/journal"
+    if override:
+        return Path(override)
+    configured = load_config().storage.dir
+    return Path(configured or DEFAULT_DATA_DIR).expanduser()
 
 
 def entries_root() -> Path:

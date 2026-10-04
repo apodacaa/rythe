@@ -37,7 +37,8 @@ get swept in on demand via the `journal-sweep` skill, which transcribes locally 
 
 ## Data lives outside this repo
 
-Entries are in `~/.local/share/journal` (override with `JOURNAL_DIR`), **never** in this repo.
+Entries are in `~/.local/share/journal` by default (the `storage.dir` setting changes it;
+`JOURNAL_DIR` overrides both), **never** in this repo.
 Tests must set `JOURNAL_DIR` to a temp directory — never touch the real journal in a test, and
 don't read the real journal during development unless the user asks for it.
 
