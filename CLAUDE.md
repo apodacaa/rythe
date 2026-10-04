@@ -23,6 +23,14 @@ get swept in on demand via the `journal-sweep` skill, which transcribes locally 
 - **Cross-platform is a goal.** Nothing OS- or desktop-specific ships in this repo (no Hyprland,
   systemd, notify-send). Optional external tools (`git`, `fzf`, a pager) need a plain fallback
   when missing. Triggers like reminders are the user's to wire up via `journal status`.
+- **The tool documents itself, by construction.** Every setting is in `src/journal/settings.py`
+  (name, type, default, description, example) and every built-in prompt set has a description in
+  `prompts.py`. `journal config`, `journal prompts` and `journal docs` are generated from those
+  and from the argparse parser, and tests fail if something exists undocumented. So: adding a
+  field to `config.py` means adding a `Setting`; a new built-in prompt set needs a
+  `DESCRIPTIONS` entry; a new command needs a `help=` (and flags need help text). Static guide
+  pages are `src/journal/docs/*.md` (overview, concepts, json, agents): update them when
+  behaviour changes. `journal docs --all` is the agent guide; the README is the human one.
 - **A bare `journal` is a blank page.** Prompts are always opt-in (`--prompt`).
 - **Never lose writing.** Editor drafts live in `<data>/drafts` until the entry is saved;
   `--at` is parsed before the editor opens; edits show the editor only the body.
@@ -47,6 +55,8 @@ in `~/.config/journal/config.toml` turns that off). It is never pushed anywhere.
   on_this_day_count}` (nulls/zeros for an empty journal).
 - Entry refs: `show`/`edit`/`tag`/`delete` take an id, `last`, `today`, or a unique prefix.
   Ambiguous prefix → exit `1`; no match → exit `2`.
+- `config`, `prompts` and `docs` shapes are in `journal docs json` (a test keeps the entry
+  fields and exit codes in that page in sync).
 - Exit codes: `0` ok, `1` usage error, `2` not found, `3` duplicate (`ingest` with a
   `message_id` that already exists — retry with `--force` only if that's actually wanted).
 
