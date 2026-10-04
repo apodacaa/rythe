@@ -2,9 +2,10 @@
 
 A personal, date/time-based journal. Two front doors onto the same data:
 
-- **TUI** (`journal`, no args): open, type, save, quit. This is for the human, not Claude.
-  Modal vim keybindings — see `src/journal/tui/keymap.py` for the full binding table, or `?`
-  inside the app.
+- **`journal` with no args (or `journal write`)**: opens `$EDITOR` on a new entry — same as
+  `journal new --editor`. This is for the human, not Claude. There's no custom TUI: a real
+  editor (vim/nvim, whatever `$EDITOR` resolves to) already does modal editing, themes, help
+  and crash recovery better than a hand-rolled one would.
 - **CLI** (`journal <command>`): this is the tool Claude uses. It never calls Claude or any
   API itself — it's plain data plumbing (create/list/show/search/tag/ingest). Every command has
   `--help`; most support `--json`.
@@ -13,17 +14,38 @@ Voice memos arrive by email (subject `record-memo: <ISO timestamp>`, one audio a
 get swept in on demand via the `journal-sweep` skill, which transcribes locally with
 `whisper-cpp` and calls `journal ingest audio`.
 
+## Design rules
+
+- **Skills are clients of the app, not part of it.** `journal-sweep` is one way to drive the
+  CLI; features live in the CLI so any user (or agent) gets them. Don't add app behaviour that
+  only works through a skill.
+- **Cross-platform is a goal.** Nothing OS- or desktop-specific ships in this repo (no Hyprland,
+  systemd, notify-send). Optional external tools (`git`, `fzf`, a pager) need a plain fallback
+  when missing. Triggers like reminders are the user's to wire up via `journal status`.
+- **A bare `journal` is a blank page.** Prompts are always opt-in (`--prompt`).
+- **Never lose writing.** Editor drafts live in `<data>/drafts` until the entry is saved;
+  `--at` is parsed before the editor opens; edits show the editor only the body.
+
 ## Data lives outside this repo
 
 Entries are in `~/.local/share/journal` (override with `JOURNAL_DIR`), **never** in this repo.
 Tests must set `JOURNAL_DIR` to a temp directory — never touch the real journal in a test, and
 don't read the real journal during development unless the user asks for it.
 
+Every write is also committed to a local git repo in the data dir (`[history] enabled = false`
+in `~/.config/journal/config.toml` turns that off). It is never pushed anywhere.
+
 ## CLI JSON contract
 
-- `--json` output is stable; treat its shape as an API. See the command table in
-  `~/.claude/plans/write-up-the-plan-vectorized-truffle.md` (or `journal <command> --help`) for
-  each command's flags and output.
+- `--json` output is stable; treat its shape as an API. `journal --help` and
+  `journal <command> --help` list each command's flags and output (the original design plan
+  describes a TUI that no longer exists, so don't use it as a reference).
+- Plain-text output (`read`, `show`, `status`, `review`) is for people and may change; scripts
+  use `--json`.
+- `journal status --json` → `{last_entry_id, last_entry_at, days_since, week_count,
+  on_this_day_count}` (nulls/zeros for an empty journal).
+- Entry refs: `show`/`edit`/`tag`/`delete` take an id, `last`, `today`, or a unique prefix.
+  Ambiguous prefix → exit `1`; no match → exit `2`.
 - Exit codes: `0` ok, `1` usage error, `2` not found, `3` duplicate (`ingest` with a
   `message_id` that already exists — retry with `--force` only if that's actually wanted).
 
