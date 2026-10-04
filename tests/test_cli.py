@@ -407,14 +407,14 @@ def test_edit_missing_returns_exit_code_2(capsys):
     assert main(["edit", "2026-01-01T000000"]) == 2
 
 
-def test_edit_invokes_editor_appends_content_and_sets_updated(monkeypatch, capsys, journal_dir):
-    main(["new", "--text", "before edit", "--json"])
+def test_edit_invokes_editor_on_the_body_only_and_sets_updated(monkeypatch, capsys, journal_dir):
+    main(["new", "--text", "before edit", "--title", "kept", "--json"])
     entry_id = json.loads(capsys.readouterr().out)["id"]
 
     calls = []
 
     def fake_call(command):
-        calls.append(command)
+        calls.append((command, Path(command[-1]).read_text()))
         with open(command[-1], "a") as f:
             f.write("added by the editor #edited\n")
         return 0
@@ -423,17 +423,17 @@ def test_edit_invokes_editor_appends_content_and_sets_updated(monkeypatch, capsy
     monkeypatch.setenv("EDITOR", "nvim --clean")
 
     assert main(["edit", entry_id]) == 0
-    out = capsys.readouterr().out
-    assert out.strip() == f"edited {entry_id}"
+    assert capsys.readouterr().out.strip() == f"edited {entry_id}"
 
-    assert len(calls) == 1
-    command = calls[0]
+    command, seen = calls[0]
     assert command[:2] == ["nvim", "--clean"]
-    assert command[-1].endswith(f"{entry_id}.txt")
+    assert "---" not in seen and "created:" not in seen  # no frontmatter exposed
+    assert seen.strip() == "before edit"
 
     main(["show", entry_id, "--json"])
     shown = json.loads(capsys.readouterr().out)
     assert "edited" in shown["tags"]
+    assert shown["title"] == "kept"
     assert shown["updated"] is not None
 
 
@@ -452,21 +452,16 @@ def test_edit_with_no_changes_leaves_updated_none(monkeypatch, capsys, journal_d
     assert shown["updated"] is None
 
 
-def test_edit_reports_corruption_without_reverting(monkeypatch, capsys, journal_dir):
-    main(["new", "--text", "before edit", "--json"])
+def test_edit_emptied_body_is_refused_and_entry_untouched(monkeypatch, capsys, journal_dir):
+    main(["new", "--text", "keep me", "--json"])
     entry_id = json.loads(capsys.readouterr().out)["id"]
 
-    def corrupt_the_file(command):
-        path = command[-1]
-        with open(path, "w") as f:
-            f.write("no frontmatter here")
-        return 0
-
-    monkeypatch.setattr("journal.cli.subprocess.call", corrupt_the_file)
+    monkeypatch.setattr("journal.cli.subprocess.call", lambda command: Path(command[-1]).write_text(""))
 
     assert main(["edit", entry_id]) == 1
-    err = capsys.readouterr().err
-    assert "may be corrupted" in err
+    assert "journal delete" in capsys.readouterr().err
+    main(["show", entry_id, "--json"])
+    assert json.loads(capsys.readouterr().out)["body"].strip() == "keep me"
 
 
 def test_new_bad_at_fails_before_opening_the_editor(capsys, monkeypatch, journal_dir):

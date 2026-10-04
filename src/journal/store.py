@@ -145,12 +145,13 @@ def _save(entry: Entry) -> None:
     path_for(entry.id).write_text(entry.to_markdown())
 
 
-def touch(entry_id: str, when: datetime) -> Entry:
-    """Set `updated` on an entry and rewrite it. For changes made outside this module, e.g. a
-    hand-edit via `journal edit` — callers should only call this when the content actually
-    changed, so `updated` doesn't drift just from opening and re-saving an entry untouched.
+def update_body(entry_id: str, body: str, when: datetime) -> Entry:
+    """Replace an entry's body and stamp `updated`. Callers should only call this when the body
+    actually changed, so `updated` doesn't drift just from opening and re-saving an entry
+    untouched. Frontmatter is never exposed to the editor, so it can't be damaged by an edit.
     """
     entry = get(entry_id)
+    entry.body = body
     entry.updated = when
     _save(entry)
     return entry

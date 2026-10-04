@@ -257,20 +257,22 @@ def test_delete_moves_entry_to_trash():
         store.get(entry.id)
 
 
-def test_touch_sets_updated():
-    entry = store.create(created=dt(8), body="hello")
+def test_update_body_replaces_body_and_sets_updated():
+    entry = store.create(created=dt(8), body="hello", title="t")
     assert entry.updated is None
 
     when = dt(9, 30)
-    touched = store.touch(entry.id, when)
+    updated = store.update_body(entry.id, "rewritten\n", when)
 
-    assert touched.updated == when
-    assert store.get(entry.id).updated == when
+    assert updated.updated == when
+    reloaded = store.get(entry.id)
+    assert reloaded.body == "rewritten\n"
+    assert reloaded.title == "t"
 
 
-def test_touch_missing_raises():
+def test_update_body_missing_raises():
     with pytest.raises(store.EntryNotFoundError):
-        store.touch("2026-01-01T000000", dt(8))
+        store.update_body("2026-01-01T000000", "x", dt(8))
 
 
 def test_delete_missing_raises():
