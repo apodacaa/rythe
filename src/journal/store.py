@@ -5,9 +5,10 @@ full directory scan on every command is fast enough, and there is no index to ke
 """
 from __future__ import annotations
 
+import calendar
 import os
 from collections import Counter
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from . import history
@@ -252,6 +253,32 @@ def on_this_day(target: date, *, tags: list[str] | None = None, source: str | No
         results.append(entry)
     results.sort(key=lambda e: e.created, reverse=True)
     return results
+
+
+def _months_ago(day: date, months: int) -> date:
+    year, month0 = divmod(day.year * 12 + day.month - 1 - months, 12)
+    return date(year, month0 + 1, min(day.day, calendar.monthrange(year, month0 + 1)[1]))
+
+
+def resurface(today: date) -> tuple[str, Entry] | None:
+    """One past entry worth showing again, with a label like "2 years ago today".
+
+    Prefers the longest look-back: the same calendar day in an earlier year (oldest first), then
+    a month ago, then a week ago — so a young journal still has something to show.
+    """
+    yearly = [e for e in on_this_day(today) if e.created.year < today.year]
+    if yearly:
+        oldest = min(yearly, key=lambda e: e.created)
+        years = today.year - oldest.created.year
+        return (f"{years} year{'s' if years != 1 else ''} ago today", oldest)
+    for label, day in (
+        ("a month ago today", _months_ago(today, 1)),
+        ("a week ago today", today - timedelta(days=7)),
+    ):
+        found = list_entries(on=day)
+        if found:
+            return (label, min(found, key=lambda e: e.created))
+    return None
 
 
 def search(

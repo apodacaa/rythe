@@ -42,6 +42,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from . import ingest, render, store, transcribe
+from .config import load_config
 from .dates import (
     parse_date as _parse_date,
     parse_datetime as _parse_when,
@@ -107,6 +108,20 @@ def _compose_in_editor() -> tuple[str, Path] | None:
     return body, path
 
 
+def _interactive() -> bool:
+    return sys.stdout.isatty()
+
+
+def _print_resurfaced(entry: Entry) -> None:
+    """After saving, show one older entry — rereading is where a journal pays off."""
+    if not load_config().resurface.enabled:
+        return
+    found = store.resurface(entry.created.date())
+    if found:
+        label, old = found
+        print(f"{label}: {_preview(old, 70)}   (journal show {old.id})")
+
+
 def cmd_new(args: argparse.Namespace) -> int:
     # Parse --at first: a bad date must fail before the user has typed a word.
     created = _parse_when(args.at) if args.at else _now()
@@ -130,6 +145,8 @@ def cmd_new(args: argparse.Namespace) -> int:
         print(json.dumps(_entry_to_dict(entry), indent=2))
     else:
         print(f"created {entry.id}")
+        if _interactive():
+            _print_resurfaced(entry)
     return 0
 
 
