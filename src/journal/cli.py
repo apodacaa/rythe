@@ -296,22 +296,29 @@ def cmd_show(args: argparse.Namespace) -> int:
 
 
 def _output(text: str, *, no_pager: bool = False) -> None:
-    """Print `text`, through $PAGER (else `less -R`) when stdout is a terminal. Falls back to a
-    plain print when there's no pager available, so this works on any OS.
+    """Print `text`, through $PAGER (else `less`) when stdout is a terminal. Falls back to a plain
+    print when there's no pager available, so this works on any OS.
+
+    Like git, if the user hasn't set LESS we give `less` FRX: quit at once when the text fits on
+    one screen (F), keep colors (R), and don't clear the screen on exit so the text stays visible
+    (X). Without this a short result opens a viewer you have to quit, and then vanishes.
     """
-    if no_pager or not sys.stdout.isatty():
-        print(text, end="" if text.endswith("\n") else "\n")
+    plain = text if text.endswith("\n") else text + "\n"
+    if no_pager or not _interactive():
+        print(plain, end="")
         return
     pager = shlex.split(os.environ["PAGER"]) if os.environ.get("PAGER") else None
     if pager is None and shutil.which("less"):
-        pager = ["less", "-R"]
+        pager = ["less"]
     if pager is None:
-        print(text, end="" if text.endswith("\n") else "\n")
+        print(plain, end="")
         return
+    env = {**os.environ}
+    env.setdefault("LESS", "FRX")
     try:
-        subprocess.run(pager, input=text, text=True)
+        subprocess.run(pager, input=text, text=True, env=env)
     except OSError:
-        print(text, end="" if text.endswith("\n") else "\n")
+        print(plain, end="")
 
 
 def cmd_read(args: argparse.Namespace) -> int:

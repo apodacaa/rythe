@@ -118,7 +118,12 @@ ENV_VARS: list[tuple[str, str]] = [
     ("NO_COLOR", "If set to anything non-empty, turns styling off (see the `appearance.color` setting)."),
     ("FORCE_COLOR", "If set, forces styling on even when output isn't a terminal."),
     ("EDITOR", "Editor opened by write/new --editor/edit (falls back to nvim, vim, then vi)."),
-    ("PAGER", "Pager for read/show/review output on a terminal (falls back to `less -R`, else plain print)."),
+    (
+        "PAGER",
+        "Pager for read/show/review/docs output on a terminal (falls back to `less`, else plain "
+        "print). If you haven't set LESS, `less` is run with LESS=FRX: it quits at once when the "
+        "text fits one screen and leaves it on screen afterwards. `--no-pager` skips it.",
+    ),
 ]
 
 
