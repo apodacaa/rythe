@@ -643,3 +643,76 @@ def test_help_documents_new_behaviour(capsys):
     assert "--raw" in help_of("show") or "raw" in help_of("show")
     assert "on_this_day_count" in help_of("status")
     assert "review" in help_of("write") and "#review" in help_of("review")
+
+
+class _FakeRun:
+    def __init__(self):
+        self.calls = []
+
+    def __call__(self, command, **kwargs):
+        self.calls.append((command, kwargs))
+
+
+@pytest.fixture
+def on_a_terminal(monkeypatch):
+    monkeypatch.setattr("journal.cli._interactive", lambda: True)
+    monkeypatch.delenv("PAGER", raising=False)
+    monkeypatch.delenv("LESS", raising=False)
+    fake = _FakeRun()
+    monkeypatch.setattr("journal.cli.subprocess.run", fake)
+    monkeypatch.setattr("journal.cli.shutil.which", lambda name: f"/usr/bin/{name}")
+    return fake
+
+
+def test_pager_defaults_to_less_that_quits_on_one_screen_and_keeps_the_text(on_a_terminal):
+    from journal.cli import _output
+
+    _output("hello\n")
+    (command, kwargs), = on_a_terminal.calls
+    assert command == ["less"]
+    assert kwargs["env"]["LESS"] == "FRX"  # F: quit if it fits, R: colors, X: don't clear the screen
+    assert kwargs["input"] == "hello\n"
+
+
+def test_a_users_own_less_setting_is_respected(on_a_terminal, monkeypatch):
+    from journal.cli import _output
+
+    monkeypatch.setenv("LESS", "-i")
+    _output("hello")
+    assert on_a_terminal.calls[0][1]["env"]["LESS"] == "-i"
+
+
+def test_pager_env_var_is_used_and_still_gets_the_less_default(on_a_terminal, monkeypatch):
+    from journal.cli import _output
+
+    monkeypatch.setenv("PAGER", "less -S")
+    _output("hello")
+    command, kwargs = on_a_terminal.calls[0]
+    assert command == ["less", "-S"] and kwargs["env"]["LESS"] == "FRX"
+
+
+def test_no_pager_flag_and_non_terminals_print_directly(on_a_terminal, monkeypatch, capsys):
+    from journal.cli import _output
+
+    _output("direct", no_pager=True)
+    monkeypatch.setattr("journal.cli._interactive", lambda: False)
+    _output("piped")
+    assert on_a_terminal.calls == []
+    assert capsys.readouterr().out == "direct\npiped\n"
+
+
+def test_without_a_pager_or_when_it_cannot_start_the_text_is_printed(on_a_terminal, monkeypatch, capsys):
+    from journal.cli import _output
+
+    monkeypatch.setattr("journal.cli.shutil.which", lambda name: None)
+    _output("no pager installed")
+    assert capsys.readouterr().out == "no pager installed\n"
+
+    monkeypatch.setattr("journal.cli.shutil.which", lambda name: f"/usr/bin/{name}")
+
+    def cannot_start(command, **kwargs):
+        raise FileNotFoundError(command[0])
+
+    monkeypatch.setattr("journal.cli.subprocess.run", cannot_start)
+    _output("fallback")
+    assert capsys.readouterr().out == "fallback\n"
