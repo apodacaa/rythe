@@ -39,7 +39,8 @@ get swept in on demand via the `journal-sweep` skill, which transcribes locally 
 - **Styling lives in `ui.py` only.** Human-facing output may use bold, color, boxes and glyphs via
   `ui` (the terminal's own 16 colors, so it follows the theme), never in `--json`, and
   `journal docs` prints raw markdown to anything but a terminal. Every styled command belongs in
-  `COMMANDS` in `tests/test_ui.py`; that test proves that stripping the escape codes yields exactly
+  `COMMANDS` in `tests/test_ui.py`, and `--help` is styled by `helpstyle.JournalParser` (build every
+  parser with it); that test proves that stripping the escape codes yields exactly
   the plain output, so pipes and scripts never change. Don't nest the same quote type inside an
   f-string (`f"{x['a']}"` is fine, `f'{x['a']}'` breaks on Python 3.11, which we support).
 - **A bare `journal` is a blank page.** Prompts are always opt-in (`--prompt`).

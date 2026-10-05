@@ -53,7 +53,7 @@ import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import configcmd, docs, ingest, prompts, render, setup, store, transcribe, ui
+from . import configcmd, docs, helpstyle, ingest, prompts, render, setup, store, transcribe, ui
 from .config import config_path, load_config
 from .dates import (
     parse_date as _parse_date,
@@ -711,7 +711,7 @@ def _fill_flag_help(parser: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = helpstyle.JournalParser(
         prog="journal",
         description="A date/time-based personal journal: $EDITOR to write, a CLI for everything else.",
         epilog=__doc__,
@@ -1014,9 +1014,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
-    args = parser.parse_args(argv)
+    # Decide on color before parsing, so `--help` (printed during parsing) honours the setting too.
     try:
         ui.configure(load_config().appearance.color)
+    except ValueError:  # an unreadable config file: commands report it; styling falls back to auto
+        ui.configure()
+    args = parser.parse_args(argv)
+    try:
         if args.command is None:
             return cmd_write(args)
         return args.func(args)
