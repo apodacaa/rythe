@@ -18,8 +18,8 @@ There are two front doors onto the same data:
 - **Tags** are `#hashtags` written inside the text. There is no separate tag field.
 - Every entry has a **source**: `cli` (typed or piped), `memo` (a transcribed voice memo), or
   `text` (imported from a file).
-- Writing is made safe: unsaved editor drafts are kept, every write is committed to a local git
-  history, and deletes only move files to a trash folder.
+- Writing is made safe: unsaved editor drafts are kept, and deletes only move files to a trash
+  folder. Backing up the data folder is up to you (see `journal docs concepts`).
 - Rereading is built in: `journal read`, `journal on-this-day`, and an older entry resurfaced
   after you save a new one. `journal review` is a weekly look-back that ends with you writing a
   reflection.
@@ -32,7 +32,7 @@ Run `journal docs --list` for all topics. The usual path:
 
 0. `journal setup`: a short guided setup for people (re-runnable; nothing is saved until you
    confirm). `journal setup --check [--json]` reports what the machine has, for anyone.
-1. `journal docs concepts`: ids, tags, time zones, drafts, history, the data layout.
+1. `journal docs concepts`: ids, tags, time zones, drafts, the data layout, backups.
 2. `journal docs commands`: every command and flag (generated from the CLI itself).
 3. `journal docs config`: every setting, what it does, and how to change it.
 4. `journal docs prompts`: the writing prompt sets and what each is for.

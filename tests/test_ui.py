@@ -45,7 +45,7 @@ def test_layout_helpers_line_up_with_and_without_color():
 
 def test_step_and_gutter_and_rule():
     ui.set_color(False)
-    assert ui.step(2, 5, "History").strip().endswith("2/5  HISTORY")
+    assert ui.step(2, 4, "Voice memos").strip().endswith("2/4  VOICE MEMOS")
     assert ui.gutter(["a", ""]).splitlines()[1].strip() == ui.glyph("gutter")
     assert "Day" in ui.rule("Day")
 
@@ -98,7 +98,7 @@ COMMANDS = [
     ["status"],
     ["model", "list"],
     ["config", "list"],
-    ["config", "explain", "history.enabled"],
+    ["config", "explain", "resurface.enabled"],
     ["config", "explain"],
     ["prompts", "list"],
     ["prompts", "show", "hard"],
@@ -113,7 +113,7 @@ COMMANDS = [
 def seeded(capsys):
     main(["new", "--at", "2025-10-04T09:00:00+02:00", "--text", "coffee and code #work", "--source", "memo"])
     main(["new", "--at", "2026-10-03T21:30:00+02:00", "--title", "Late", "--text", "a coffee, again #home"])
-    main(["config", "set", "history.enabled", "false"])
+    main(["config", "set", "resurface.enabled", "false"])
     capsys.readouterr()
 
 

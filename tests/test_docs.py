@@ -31,7 +31,7 @@ def test_default_is_overview_with_topic_list_and_all_prints_everything(capsys):
     out = run(capsys, "docs", "--all")[1]
     assert all(f"# journal: {t}" in out or t == "overview" for t in ("concepts", "commands", "configuration", "writing prompts"))
     payload = json.loads(run(capsys, "docs", "config", "--json")[1])
-    assert payload["topics"] == ["config"] and "history.enabled" in payload["markdown"]
+    assert payload["topics"] == ["config"] and "resurface.enabled" in payload["markdown"]
 
 
 def test_commands_doc_covers_every_command_and_subcommand():

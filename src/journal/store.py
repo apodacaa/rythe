@@ -12,7 +12,6 @@ from collections import Counter
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from . import history
 from .config import load_config
 from .entry import Entry, id_for
 from .tags import extract_tags, normalize_tag
@@ -168,7 +167,6 @@ def create(
     path = _entry_path(entry.id)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(entry.to_markdown())
-    history.record(data_dir(), f"new {entry.id}")
     return entry
 
 
@@ -186,9 +184,8 @@ def path_for(entry_id: str) -> Path:
     return path
 
 
-def _save(entry: Entry, action: str = "edit") -> None:
+def _save(entry: Entry) -> None:
     path_for(entry.id).write_text(entry.to_markdown())
-    history.record(data_dir(), f"{action} {entry.id}")
 
 
 def update_body(entry_id: str, body: str, when: datetime) -> Entry:
@@ -209,7 +206,7 @@ def set_audio(entry_id: str, audio_relpath: str) -> Entry:
     """
     entry = get(entry_id)
     entry.audio = audio_relpath
-    _save(entry, "audio")
+    _save(entry)
     return entry
 
 
@@ -240,7 +237,6 @@ def delete(entry_id: str) -> Path:
             trash_audio.mkdir(parents=True, exist_ok=True)
             audio_path.rename(trash_audio / f"{audio_path.stem}.{stamp}{audio_path.suffix}")
 
-    history.record(data_dir(), f"delete {entry_id}")
     return dest
 
 
@@ -381,5 +377,5 @@ def add_tags(entry_id: str, new_tags: list[str]) -> Entry:
         body += " ".join(f"#{t}" for t in missing) + "\n"
         entry.body = body
         entry.updated = datetime.now().astimezone()
-        _save(entry, "tag")
+        _save(entry)
     return entry

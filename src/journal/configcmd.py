@@ -150,21 +150,22 @@ def _storage_notes(old_dir) -> None:
     if new_dir != old_dir and old_dir.exists() and any(old_dir.iterdir()):
         print(
             f"journal: entries already in {old_dir} were not moved; copy that whole folder to "
-            f"{new_dir} (it holds the git history too) or they won't show up",
+            f"{new_dir} or they won't show up",
             file=sys.stderr,
         )
 
 
 def cmd_config_unset(args: argparse.Namespace) -> int:
     setting = settings.lookup(args.key)
-    if setting is None:
-        return _unknown_key(args.key)
     raw = load_raw()
+    stale = setting is None and args.key in settings.unknown_keys(raw)  # e.g. a removed option
+    if setting is None and not stale:
+        return _unknown_key(args.key)
     if not settings.unset_in(raw, args.key):
         print(f"{args.key} is already at its default")
         return 0
     backup = write_raw(raw)
-    print(f"unset {args.key} (back to the default)")
+    print(f"unset {args.key} " + ("(it was an unused setting)" if stale else "(back to the default)"))
     if backup:
         print(
             f"journal: your config had comments, which rewriting drops; the old file is saved as {backup}",

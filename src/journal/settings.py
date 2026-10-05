@@ -17,7 +17,7 @@ PROMPT_NAME_RE = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
 
 @dataclass(frozen=True)
 class Setting:
-    key: str  # dotted, e.g. "history.enabled"
+    key: str  # dotted, e.g. "resurface.enabled"
     kind: str  # "bool" | "choice" | "text" | "path" | "list"
     default: object
     description: str
@@ -31,7 +31,7 @@ SETTINGS: list[Setting] = [
         "storage.dir",
         "path",
         None,
-        "The folder where entries (and audio, whisper models, drafts, trash and the git history) "
+        "The folder where entries (and audio, whisper models, drafts and trash) "
         "are stored. Absolute, or starting with ~. The $JOURNAL_DIR environment variable, if set, "
         "takes precedence. Changing it does not move existing entries: copy the old folder to the "
         "new location first (see `journal docs concepts`). `journal path` prints the folder in use.",
@@ -48,15 +48,6 @@ SETTINGS: list[Setting] = [
         "terminal's own 16-color palette, so they follow your terminal theme.",
         "journal config set appearance.color never",
         ("auto", "always", "never"),
-    ),
-    Setting(
-        "history.enabled",
-        "bool",
-        True,
-        "Commit every write (new, edit, tag, delete, ingest) to a local git repo inside the data "
-        "directory, as a safety net against bad edits and deletes. Never pushed anywhere. Needs "
-        "`git` on PATH; if it's missing, writes still succeed without history.",
-        "journal config set history.enabled false",
     ),
     Setting(
         "resurface.enabled",

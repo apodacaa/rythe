@@ -15,9 +15,9 @@ $ journal review               # read your week, then write a reflection
 
 - **A blank page is the default.** `journal` with no arguments opens your own editor (vim, nvim,
   whatever `$EDITOR` is). Prompts exist, but only when you ask for them.
-- **Your words are safe.** Unsaved drafts survive a crash, every write is committed to a local git
-  history, deletes only move files to a trash folder, and an edit never exposes the file's
-  metadata to the editor.
+- **Your words are safe.** Unsaved drafts survive a crash, deletes only move files to a trash
+  folder, and an edit never exposes the file's metadata to the editor. Backups are yours to choose:
+  the journal is one folder of plain text, so any way you already back up a folder works.
 - **Rereading is the point.** Ordinary days are worth more later than they seem. `journal read`,
   `journal on-this-day`, an older entry shown after you save a new one, and a weekly
   `journal review` are all built in.
@@ -38,24 +38,24 @@ cd path/to/journal           # a checkout of this repository
 uv tool install .            # puts `journal` on your PATH (use --editable while developing)
 ```
 
-Optional, each with a plain fallback if missing: `git` (history), `fzf` (an entry picker for
+Optional, each with a plain fallback if missing: `fzf` (an entry picker for
 `journal edit` and `journal show`), a pager such as `less`, and `ffmpeg` plus `whisper-cpp` for
 voice memos.
 
 ## Getting started
 
 There's nothing you have to set up: the first `journal` or `journal add` creates the folders it
-needs. If you'd like a guided tour of the few choices that matter (where the journal lives, history,
+needs. If you'd like a guided tour of the few choices that matter (where the journal lives,
 voice memos), run:
 
 ```
 journal setup                        # a short, re-runnable wizard; nothing is saved until you confirm
-journal setup --check                # just report what this machine has (editor, git, fzf, ffmpeg…)
+journal setup --check                # just report what this machine has (editor, fzf, ffmpeg…)
 ```
 
 | What | Default location | Change it |
 |---|---|---|
-| Your entries (plus audio, drafts, trash, git history) | `~/.local/share/journal` | `journal config set storage.dir ~/Documents/journal` |
+| Your entries (plus audio, drafts and trash) | `~/.local/share/journal` | `journal config set storage.dir ~/Documents/journal` |
 | Settings file | `~/.config/journal/config.toml` | the `JOURNAL_CONFIG` environment variable |
 
 Check where things are with `journal path` (the journal folder) and `journal config path` (the
@@ -66,7 +66,7 @@ settings file).
 journal:
 
 ```
-mv ~/.local/share/journal ~/Documents/journal      # the whole folder, history included
+mv ~/.local/share/journal ~/Documents/journal      # the whole folder
 journal config set storage.dir ~/Documents/journal
 ```
 
@@ -132,9 +132,9 @@ Everything is optional. See and change settings from the CLI instead of hunting 
 
 ```
 journal config list                  # every setting: value, default, where it came from
-journal config explain history.enabled
-journal config set history.enabled false
-journal config unset history.enabled
+journal config explain resurface.enabled
+journal config set resurface.enabled false
+journal config unset resurface.enabled
 ```
 
 Appearance: colors and bold are on for terminals and off when piped, with `--json`, or when

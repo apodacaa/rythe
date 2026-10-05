@@ -36,7 +36,7 @@ With no subcommand (or `journal write`), opens $EDITOR on a new entry — same a
 
 Settings and docs (both explain themselves; `journal docs --all` prints everything):
   journal config list                         # every setting: value, default, source
-  journal config set history.enabled false    # change one (validated); `config explain` says what each does
+  journal config set resurface.enabled false  # change one (validated); `config explain` says what each does
   journal prompts list                        # the writing prompt sets and what each is for
   journal docs                                # the built-in guide; `docs --list` for topics
 """
@@ -145,7 +145,7 @@ def _print_setup_tip() -> None:
     setup` or any `config set` creates it), point at the guided setup once. Stateless on purpose.
     """
     if store.count_entries() == 1 and not config_path().exists():
-        print("tip: `journal setup` walks you through the options (folder, history, voice memos).")
+        print("tip: `journal setup` walks you through the options (folder, voice memos).")
 
 
 def cmd_new(args: argparse.Namespace) -> int:
@@ -855,7 +855,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_cfg_list.set_defaults(func=configcmd.cmd_config_list)
 
     p_cfg_get = config_sub.add_parser("get", help="print one setting's value")
-    p_cfg_get.add_argument("key", help="e.g. history.enabled")
+    p_cfg_get.add_argument("key", help="e.g. resurface.enabled")
     p_cfg_get.add_argument("--json", action="store_true")
     p_cfg_get.set_defaults(func=configcmd.cmd_config_get)
 
@@ -869,7 +869,7 @@ def build_parser() -> argparse.ArgumentParser:
             "The file is rewritten; hand-written comments are saved to config.toml.bak first."
         ),
     )
-    p_cfg_set.add_argument("key", help="e.g. history.enabled")
+    p_cfg_set.add_argument("key", help="e.g. resurface.enabled")
     p_cfg_set.add_argument("values", nargs="+", help="the new value (several for prompts.<name>)")
     p_cfg_set.add_argument("--json", action="store_true")
     p_cfg_set.set_defaults(func=configcmd.cmd_config_set)
@@ -912,7 +912,7 @@ def build_parser() -> argparse.ArgumentParser:
         "setup",
         help="a short guided setup, or --check to see what this machine has",
         description=(
-            "Walk through the few choices that matter (journal folder, history, resurfacing, "
+            "Walk through the few choices that matter (journal folder, resurfacing, "
             "voice memos). Safe to re-run: nothing is saved until you confirm. --check reports "
             "which tools are available and what each enables, without asking anything."
         ),

@@ -34,7 +34,7 @@ def test_registry_defaults_match_the_dataclass_defaults():
 
 def test_list_defaults_then_json(capsys):
     code, out, _ = run(capsys, "config", "list")
-    assert code == 0 and "not created yet" in out and "history.enabled" in out
+    assert code == 0 and "not created yet" in out and "resurface.enabled" in out
 
     code, out, _ = run(capsys, "config", "list", "--json")
     payload = json.loads(out)
@@ -44,23 +44,23 @@ def test_list_defaults_then_json(capsys):
 
 
 def test_set_get_unset_round_trip(capsys):
-    assert run(capsys, "config", "set", "history.enabled", "off")[0] == 0
-    assert load_raw() == {"history": {"enabled": False}}
-    assert load_config().history.enabled is False
+    assert run(capsys, "config", "set", "resurface.enabled", "off")[0] == 0
+    assert load_raw() == {"resurface": {"enabled": False}}
+    assert load_config().resurface.enabled is False
 
-    code, out, _ = run(capsys, "config", "get", "history.enabled", "--json")
-    assert json.loads(out) == {"key": "history.enabled", "value": False, "default": True, "source": "config file"}
+    code, out, _ = run(capsys, "config", "get", "resurface.enabled", "--json")
+    assert json.loads(out) == {"key": "resurface.enabled", "value": False, "default": True, "source": "config file"}
 
     code, out, _ = run(capsys, "config", "list")
     assert "(config file; default true)" in out
 
-    assert run(capsys, "config", "unset", "history.enabled")[0] == 0
+    assert run(capsys, "config", "unset", "resurface.enabled")[0] == 0
     assert load_raw() == {}  # empty section removed
-    assert "already at its default" in run(capsys, "config", "unset", "history.enabled")[1]
+    assert "already at its default" in run(capsys, "config", "unset", "resurface.enabled")[1]
 
 
 def test_set_validates_values(capsys):
-    assert run(capsys, "config", "set", "history.enabled", "maybe")[0] == 1
+    assert run(capsys, "config", "set", "resurface.enabled", "maybe")[0] == 1
     code, _, err = run(capsys, "config", "set", "transcribe.model", "huge")
     assert code == 1 and "tiny" in err
     assert run(capsys, "config", "set", "transcribe.language", "")[0] == 1
@@ -70,7 +70,7 @@ def test_set_validates_values(capsys):
 
 def test_unknown_key_suggests_and_exits_1(capsys):
     code, _, err = run(capsys, "config", "set", "histroy.enabled", "true")
-    assert code == 1 and "unknown setting" in err and "history.enabled" in err
+    assert code == 1 and "unknown setting" in err and "resurface.enabled" in err
     assert run(capsys, "config", "get", "nope")[0] == 1
     assert run(capsys, "config", "explain", "nope")[0] == 1
 
@@ -88,20 +88,20 @@ def test_set_keeps_other_settings_and_backs_up_comments(capsys):
     config_path().parent.mkdir(parents=True, exist_ok=True)
     config_path().write_text('# my notes\n[transcribe]\nmodel = "medium"\n')
 
-    code, _, err = run(capsys, "config", "set", "history.enabled", "false")
+    code, _, err = run(capsys, "config", "set", "resurface.enabled", "false")
     backup = config_path().with_name(config_path().name + ".bak")
     assert code == 0 and str(backup) in err
-    assert load_raw() == {"transcribe": {"model": "medium"}, "history": {"enabled": False}}
+    assert load_raw() == {"transcribe": {"model": "medium"}, "resurface": {"enabled": False}}
     assert "# my notes" in backup.read_text()
 
 
 def test_unknown_keys_in_the_file_are_ignored_but_reported(capsys):
     config_path().parent.mkdir(parents=True, exist_ok=True)
-    config_path().write_text("[history]\nenabled = false\ntypo = 1\n[mystery]\nx = 1\n")
+    config_path().write_text("[resurface]\nenabled = false\ntypo = 1\n[mystery]\nx = 1\n")
 
-    assert load_config().history.enabled is False  # no crash
+    assert load_config().resurface.enabled is False  # no crash
     payload = json.loads(run(capsys, "config", "list", "--json")[1])
-    assert set(payload["unknown_keys"]) == {"history.typo", "mystery.x"}
+    assert set(payload["unknown_keys"]) == {"resurface.typo", "mystery.x"}
 
 
 def test_invalid_toml_is_a_clean_error(capsys):
@@ -112,8 +112,8 @@ def test_invalid_toml_is_a_clean_error(capsys):
 
 
 def test_explain_one_and_all(capsys):
-    code, out, _ = run(capsys, "config", "explain", "history.enabled")
-    assert "local git repo" in out and "default: true" in out and "now: true (default)" in out
+    code, out, _ = run(capsys, "config", "explain", "resurface.enabled")
+    assert "older entry" in out and "default: true" in out and "now: true (default)" in out
 
     out = run(capsys, "config", "explain")[1]
     assert all(s.key in out for s in settings.SETTINGS) and "prompts.<name>" in out
@@ -199,3 +199,17 @@ def test_storage_dir_shows_its_default_in_list_and_explain(capsys):
     assert "~/.local/share/journal" in run(capsys, "config", "list")[1]
     out = run(capsys, "config", "explain", "storage.dir")[1]
     assert "default: ~/.local/share/journal" in out and "JOURNAL_DIR" in out
+
+
+def test_a_leftover_history_section_from_an_older_version_is_ignored_and_can_be_removed(capsys):
+    config_path().parent.mkdir(parents=True, exist_ok=True)
+    config_path().write_text('[history]\nenabled = false\n\n[transcribe]\nmodel = "medium"\n')
+
+    assert load_config().transcribe.model == "medium"  # no crash from the removed option
+    payload = json.loads(run(capsys, "config", "list", "--json")[1])
+    assert payload["unknown_keys"] == ["history.enabled"]
+
+    code, out, _ = run(capsys, "config", "unset", "history.enabled")
+    assert code == 0 and "unused setting" in out
+    assert load_raw() == {"transcribe": {"model": "medium"}}
+    assert run(capsys, "config", "unset", "history.enabled")[0] == 1  # now it's simply unknown

@@ -18,7 +18,6 @@ from .configcmd import _fmt
 # The settings the wizard asks about; a test checks each one is in the settings registry.
 WIZARD_KEYS = (
     "storage.dir",
-    "history.enabled",
     "resurface.enabled",
     "transcribe.model",
     "transcribe.language",
@@ -54,12 +53,6 @@ def environment_report() -> dict:
             " ".join(editor) if editor_path else "",
             "writing entries (`journal`, `journal write`, `journal edit`)",
             "set $EDITOR (for example `export EDITOR=nano`) or install nvim or vim",
-        ),
-        _tool(
-            "git",
-            "git",
-            "a local history of every write",
-            "install git; without it everything still works, just without history",
         ),
         _tool(
             "fzf",
@@ -128,7 +121,7 @@ def render_report(report: dict) -> str:
     return "\n".join(lines)
 
 
-TOTAL_STEPS = 5  # folder, history, resurfacing, voice memos, prompts
+TOTAL_STEPS = 4  # folder, resurfacing, voice memos, prompts
 
 
 class _Wizard:
@@ -203,8 +196,8 @@ class _Wizard:
         entries = f" ({count} {'entry' if count == 1 else 'entries'})" if count else ""
         self.info(
             ui.style(
-                "Entries are plain text files in one folder, together with audio, drafts and a git "
-                "history. A folder you already back up (a synced one, say) is a good home.",
+                "Entries are plain text files in one folder, together with audio and drafts. A "
+                "folder you already back up (a synced one, say) is a good home.",
                 "dim",
             ),
             "",
@@ -228,28 +221,8 @@ class _Wizard:
             if count:
                 self.moved_from = current
 
-    def history(self) -> None:
-        self.heading(2, "Keep a history of your writing?")
-        if shutil.which("git") is None:
-            self.info(
-                ui.style(
-                    "Every write can be saved to a local git history (never uploaded), but git isn't "
-                    "installed, so that's off for now. Install git and re-run this to turn it on.",
-                    "dim",
-                )
-            )
-            return
-        self.info(
-            ui.style(
-                "Every write (new, edit, delete…) is saved to a local git history inside the "
-                "journal folder, so a bad edit or delete can always be undone. It's never uploaded.",
-                "dim",
-            )
-        )
-        self.propose("history.enabled", self.yes_no("Keep a local history?", bool(self.current("history.enabled"))))
-
     def resurface(self) -> None:
-        self.heading(3, "Bring up the past?")
+        self.heading(2, "Bring up the past?")
         self.info(
             ui.style(
                 "After you save an entry, journal can show one older one (the same day last year, "
@@ -263,7 +236,7 @@ class _Wizard:
         )
 
     def voice_memos(self) -> None:
-        self.heading(4, "Voice memos?")
+        self.heading(3, "Voice memos?")
         self.info(
             ui.style(
                 "journal can turn a recording into an entry, transcribing it on this computer with "
@@ -331,7 +304,7 @@ class _Wizard:
 
     def prompts_info(self) -> None:
         extra = load_config().prompts
-        self.heading(5, "Writing prompts")
+        self.heading(4, "Writing prompts")
         rows = [ui.style("Always optional; a bare `journal` is a blank page.", "dim"), ""]
         for name in sorted(prompts.available(extra)):
             rows.append(f"{ui.style(f'{name:<9}', 'bold', 'cyan')} {prompts.SUMMARIES.get(name, 'your own set')}")
@@ -367,7 +340,7 @@ class _Wizard:
                 "\n" + ui.gutter(
                     [
                         f"Your existing entries are still in {self.moved_from}. To bring them along,",
-                        "move the whole folder (history included):",
+                        "move the whole folder:",
                         "",
                         f"    {ui.style(f'mv {self.moved_from} {new_dir}', 'bold')}",
                     ]
@@ -397,7 +370,6 @@ def run_wizard(
         say("")
         wiz.welcome(environment_report())
         wiz.folder()
-        wiz.history()
         wiz.resurface()
         wiz.voice_memos()
         wiz.prompts_info()

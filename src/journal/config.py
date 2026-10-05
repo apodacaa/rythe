@@ -25,11 +25,6 @@ class MemoConfig:
 
 
 @dataclass
-class HistoryConfig:
-    enabled: bool = True
-
-
-@dataclass
 class ResurfaceConfig:
     enabled: bool = True
 
@@ -48,7 +43,6 @@ class AppearanceConfig:
 class Config:
     transcribe: TranscribeConfig = field(default_factory=TranscribeConfig)
     memo: MemoConfig = field(default_factory=MemoConfig)
-    history: HistoryConfig = field(default_factory=HistoryConfig)
     resurface: ResurfaceConfig = field(default_factory=ResurfaceConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
     appearance: AppearanceConfig = field(default_factory=AppearanceConfig)
@@ -82,7 +76,6 @@ def load_config() -> Config:
     return Config(
         transcribe=TranscribeConfig(**_known(TranscribeConfig, raw.get("transcribe", {}))),
         memo=MemoConfig(**_known(MemoConfig, raw.get("memo", {}))),
-        history=HistoryConfig(**_known(HistoryConfig, raw.get("history", {}))),
         resurface=ResurfaceConfig(**_known(ResurfaceConfig, raw.get("resurface", {}))),
         storage=StorageConfig(**_known(StorageConfig, raw.get("storage", {}))),
         appearance=AppearanceConfig(**_known(AppearanceConfig, raw.get("appearance", {}))),
