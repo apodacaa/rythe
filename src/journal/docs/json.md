@@ -38,7 +38,7 @@ Returned by `new`, `add`, `show`, `tag`, `ingest audio|text` and inside `list`:
 - `config get --json`: `{"key", "value", "default", "source"}`; `config set --json`:
   `{"key", "value"}`; `config explain --json`: the same setting objects as `config list`.
 - `setup --check --json`: `{"checks": [{"name", "found", "detail", "needed_for", "hint"}],
-  "data_dir", "config_path", "config_exists", "entries"}`. `checks` covers editor, git, fzf, pager,
+  "data_dir", "config_path", "config_exists", "entries"}`. `checks` covers editor, fzf, pager,
   ffmpeg, whisper-cli and the configured whisper model; `hint` says what to do (and what happens
   without it) when `found` is false.
 - `model list --json`: `[{"name", "file", "downloaded", "approx_mb", "note"}]` (`note` says what the model is like).

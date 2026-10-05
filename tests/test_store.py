@@ -294,3 +294,14 @@ def test_delete_moves_audio_too(journal_dir):
     assert len(trashed_audio) == 1
     assert trashed_audio[0].read_bytes() == b"fake audio"
     assert trashed.exists()
+
+
+def test_writes_never_create_version_control_files_in_the_data_dir(journal_dir):
+    """The journal doesn't manage backups: no git repo, no .gitignore, nothing but its own files."""
+    entry = store.create(created=dt(8), body="hello")
+    store.update_body(entry.id, "changed\n", dt(9))
+    store.add_tags(entry.id, ["x"])
+    store.delete(entry.id)
+
+    assert not (journal_dir / ".git").exists() and not (journal_dir / ".gitignore").exists()
+    assert {p.name for p in journal_dir.iterdir()} <= {"entries", "audio", ".trash"}

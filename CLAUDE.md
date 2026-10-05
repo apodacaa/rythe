@@ -21,7 +21,7 @@ get swept in on demand via the `journal-sweep` skill, which transcribes locally 
   CLI; features live in the CLI so any user (or agent) gets them. Don't add app behaviour that
   only works through a skill.
 - **Cross-platform is a goal.** Nothing OS- or desktop-specific ships in this repo (no Hyprland,
-  systemd, notify-send). Optional external tools (`git`, `fzf`, a pager) need a plain fallback
+  systemd, notify-send). Optional external tools (`fzf`, a pager) need a plain fallback
   when missing. Triggers like reminders are the user's to wire up via `journal status`.
 - **The tool documents itself, by construction.** Every setting is in `src/journal/settings.py`
   (name, type, default, description, example) and every built-in prompt set has a description in
@@ -53,8 +53,8 @@ Entries are in `~/.local/share/journal` by default (the `storage.dir` setting ch
 Tests must set `JOURNAL_DIR` to a temp directory — never touch the real journal in a test, and
 don't read the real journal during development unless the user asks for it.
 
-Every write is also committed to a local git repo in the data dir (`[history] enabled = false`
-in `~/.config/journal/config.toml` turns that off). It is never pushed anywhere.
+The journal doesn't manage backups (no git history, no sync): it's one folder of plain text and
+users back it up however they like. Don't add backup or version-control features.
 
 ## CLI JSON contract
 

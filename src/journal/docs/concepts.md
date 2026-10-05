@@ -40,8 +40,6 @@ same id exits 3 unless `--force` is given.
 - **Drafts:** the editor works on a file in `<data>/drafts`. It's deleted only after the entry is
   saved. If anything goes wrong (a crash, a killed editor, a failed save), the next `journal
   write` resumes the draft.
-- **History:** every write is committed to a local git repo in the data directory (setting
-  `history.enabled`). It is never pushed anywhere.
 - **Trash:** `journal delete` moves an entry (and its audio) to `<data>/.trash`; nothing is
   purged.
 - **Edits show only the body.** The editor never sees the frontmatter, so an edit can't corrupt
@@ -69,10 +67,9 @@ environment variable overrides that when set. `journal path` prints the folder i
 ~/.local/share/journal/        (storage.dir, or JOURNAL_DIR)
   entries/2026/09/2026-09-30T164608.txt
   audio/2026-09-30T164608.m4a      original voice memos
-  models/ggml-small.bin            whisper models (not in history)
-  drafts/                          unsaved editor drafts (not in history)
-  .trash/                          deleted entries (not in history)
-  .git/                            local history
+  models/ggml-small.bin            whisper models (large; you can re-download them)
+  drafts/                          unsaved editor drafts
+  .trash/                          deleted entries
 ~/.config/journal/config.toml      settings (override with JOURNAL_CONFIG)
 ```
 
@@ -82,7 +79,7 @@ the text.
 ## Moving your journal
 
 Changing `storage.dir` only changes where the journal looks; it does not move files. To relocate
-an existing journal, move the whole folder (it contains the entries, audio and the git history),
+an existing journal, move the whole folder (it contains the entries, audio and the rest),
 then point the setting at it:
 
 ```
@@ -96,3 +93,11 @@ If `JOURNAL_DIR` is set in your shell it wins over the setting, so unset it (or 
 `journal config set storage.dir` warns about both situations. Programs not started from your
 shell (an agent, a scheduler) don't see shell variables, which is why the setting is the reliable
 choice.
+
+## Backups
+
+The journal doesn't manage backups; how you keep copies is up to you. The whole journal is one
+ordinary folder of text files (`journal path` prints it), so anything that copies or syncs a folder
+works: a synced folder, `rsync` or a scheduled copy to another disk, a backup tool, or your own git
+repository. The `models/` folder is large and can be re-downloaded, so you may want to leave it
+out.
