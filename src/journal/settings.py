@@ -39,6 +39,17 @@ SETTINGS: list[Setting] = [
         default_text="~/.local/share/journal",
     ),
     Setting(
+        "appearance.color",
+        "choice",
+        "auto",
+        "Whether human-facing output uses color and bold. `auto` styles output only when it goes to "
+        "a terminal (never when piped, with --json, or when the NO_COLOR environment variable is "
+        "set); `always` forces styling (like FORCE_COLOR); `never` turns it off. Colors are your "
+        "terminal's own 16-color palette, so they follow your terminal theme.",
+        "journal config set appearance.color never",
+        ("auto", "always", "never"),
+    ),
+    Setting(
         "history.enabled",
         "bool",
         True,
@@ -104,6 +115,8 @@ ENV_VARS: list[tuple[str, str]] = [
         "everywhere, use `journal config set storage.dir` instead. Tests always set this.",
     ),
     ("JOURNAL_CONFIG", "Path of the config file (default ~/.config/journal/config.toml)."),
+    ("NO_COLOR", "If set to anything non-empty, turns styling off (see the `appearance.color` setting)."),
+    ("FORCE_COLOR", "If set, forces styling on even when output isn't a terminal."),
     ("EDITOR", "Editor opened by write/new --editor/edit (falls back to nvim, vim, then vi)."),
     ("PAGER", "Pager for read/show/review output on a terminal (falls back to `less -R`, else plain print)."),
 ]

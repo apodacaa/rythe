@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
+import sys
 from importlib import resources
 
-from . import prompts, settings
+from . import prompts, settings, ui
 from .config import config_path
 
 
@@ -157,16 +159,77 @@ def render_topic(name: str) -> str:
     return TOPICS[name][1]()
 
 
-def cmd_docs(args: argparse.Namespace) -> int:
-    import sys
+_INLINE = re.compile(r"(\*\*[^*]+\*\*|`[^`]+`)")
+_BULLET = re.compile(r"^(\s*)- (.*)")
+_NUMBERED = re.compile(r"^(\s*)(\d+\.) (.*)")
 
+
+def _inline(text: str) -> str:
+    def repl(m: re.Match) -> str:
+        token = m.group(0)
+        if token.startswith("**"):
+            return ui.style(token[2:-2], "bold")
+        return ui.style(token[1:-1], "bold", "cyan")
+
+    return _INLINE.sub(repl, text)
+
+
+def style_markdown(text: str) -> str:
+    """Render the guide's markdown as styled terminal text: colored headings, highlighted code,
+    bullets and tables. Only used on a terminal; pipes and agents get the raw markdown.
+    """
+    out: list[str] = []
+    in_code = False
+    gutter = ui.style(ui.glyph("gutter"), "gray")
+    for line in text.splitlines():
+        if line.startswith("```"):
+            in_code = not in_code
+            continue
+        if in_code:
+            out.append(f"  {gutter}  {ui.style(line, 'bold')}")
+        elif line.startswith("# "):
+            out += ["", ui.style(line[2:], "bold", "bright_cyan"), ui.style(ui.glyph("rule") * ui.width(), "cyan")]
+        elif line.startswith("## "):
+            out += ["", ui.style(ui.glyph("bar"), "magenta") + " " + ui.style(line[3:], "bold", "cyan")]
+        elif line.startswith("### "):
+            out += ["", ui.style(line[4:], "bold", "magenta")]
+        elif line.strip() == "---":
+            out += ["", ui.rule(), ""]
+        elif (m := _BULLET.match(line)):
+            out.append(f"{m.group(1)}{ui.style(ui.glyph('dot'), 'bold', 'magenta')} {_inline(m.group(2))}")
+        elif (m := _NUMBERED.match(line)):
+            out.append(f"{m.group(1)}{ui.style(m.group(2), 'bold', 'magenta')} {_inline(m.group(3))}")
+        elif line.startswith("> "):
+            out.append(f" {gutter} {ui.style(_inline(line[2:]), 'italic')}")
+        elif line.startswith("|"):
+            pipe = ui.style("|", "gray")
+            out.append(pipe.join(_inline(cell) for cell in line.split("|")))
+        else:
+            out.append(_inline(line))
+    collapsed: list[str] = []
+    for line in out:  # no runs of blank lines
+        if line == "" and collapsed and collapsed[-1] == "":
+            continue
+        collapsed.append(line)
+    return "\n".join(collapsed).strip("\n") + "\n"
+
+
+def _on_terminal() -> bool:
+    """Styled rendering needs a real terminal as well as color: `FORCE_COLOR` or an
+    `appearance.color = always` setting must never turn a pipe (an agent) into styled text.
+    """
+    return ui.color() and sys.stdout.isatty()
+
+
+def cmd_docs(args: argparse.Namespace) -> int:
     if args.list:
         rows = [{"topic": name, "summary": summary} for name, (summary, _) in TOPICS.items()]
         if args.json:
             print(json.dumps(rows, indent=2))
         else:
             for r in rows:
-                print(f"{r['topic']:<10} {r['summary']}")
+                topic = r["topic"]
+                print(f"{ui.style(f'{topic:<10}', 'bold', 'cyan')} {r['summary']}")
         return 0
     if args.all:
         names = list(TOPICS)
@@ -181,7 +244,15 @@ def cmd_docs(args: argparse.Namespace) -> int:
     if args.json:
         print(json.dumps({"topics": names, "markdown": text}, indent=2, ensure_ascii=False))
         return 0
-    print(text, end="" if text.endswith("\n") else "\n")
+    footer = ""
     if not args.topic and not args.all:
-        print("\nTopics: " + ", ".join(TOPICS) + "  (journal docs <topic>, or --list, or --all)")
+        footer = "\nTopics: " + ", ".join(TOPICS) + "  (journal docs <topic>, or --list, or --all)\n"
+    if _on_terminal():
+        from .cli import _output  # lazy: cli imports this module
+
+        _output(style_markdown(text) + (ui.style(footer, "dim") if footer else ""), no_pager=args.no_pager)
+        return 0
+    print(text, end="" if text.endswith("\n") else "\n")
+    if footer:
+        print(footer.rstrip("\n"))
     return 0

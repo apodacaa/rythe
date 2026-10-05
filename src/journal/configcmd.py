@@ -10,7 +10,7 @@ import json
 import os
 import sys
 
-from . import prompts, settings, store
+from . import prompts, settings, store, ui
 from .config import config_path, load_raw, write_raw
 
 
@@ -76,7 +76,10 @@ def cmd_config_list(args: argparse.Namespace) -> int:
         return 0
 
     path = config_path()
-    print(f"config file: {path}" + ("" if path.exists() else " (not created yet; all defaults)"))
+    print(
+        f"{ui.style('config file:', 'bold')} {ui.style(str(path), 'cyan')}"
+        + ("" if path.exists() else ui.style(" (not created yet; all defaults)", "dim"))
+    )
     width = max(len(r["key"]) for r in rows)
     for r in rows:
         if r["source"] == "default":
@@ -88,10 +91,13 @@ def cmd_config_list(args: argparse.Namespace) -> int:
         value = _fmt(r["value"], settings.lookup(r["key"]))
         if r["kind"] == "list":
             value = f"{len(r['value'])} prompt{'s' if len(r['value']) != 1 else ''}"
-        print(f"  {r['key']:<{width}}  {value:<14} {note}")
+        changed = r["source"] != "default"
+        shown = ui.style(f"{value:<14}", "bold", "green") if changed else f"{value:<14}"
+        key = r["key"]
+        print(f"  {ui.style(f'{key:<{width}}', 'bold')}  {shown} {ui.style(note, 'dim')}")
     if unknown:
-        print(f"unknown keys in the file (ignored): {', '.join(unknown)}")
-    print("`journal config explain [key]` says what a setting does; `journal docs config` has it all.")
+        print(ui.warn(f"unknown keys in the file (ignored): {', '.join(unknown)}"))
+    print(ui.style("`journal config explain [key]` says what a setting does; `journal docs config` has it all.", "dim"))
     return 0
 
 
@@ -168,12 +174,15 @@ def cmd_config_unset(args: argparse.Namespace) -> int:
 
 
 def _explain_text(setting: settings.Setting, raw: dict) -> str:
-    lines = [setting.key, f"  {setting.description}", f"  type: {_kind_label(setting)}"]
+    def label(name: str) -> str:
+        return ui.style(f"  {name}:", "dim")
+
+    lines = [ui.style(setting.key, "bold", "cyan"), f"  {setting.description}", f"{label('type')} {_kind_label(setting)}"]
     if setting.kind != "list":
-        lines.append(f"  default: {_fmt(setting.default, setting)}")
+        lines.append(f"{label('default')} {_fmt(setting.default, setting)}")
         value, source = settings.current(raw, setting)
-        lines.append(f"  now: {_fmt(value, setting)} ({source})")
-    lines.append(f"  example: {setting.example}")
+        lines.append(f"{label('now')} {ui.style(_fmt(value, setting), 'bold')} {ui.style('(' + source + ')', 'dim')}")
+    lines.append(f"{label('example')} {ui.style(setting.example, 'bold')}")
     return "\n".join(lines)
 
 
@@ -240,9 +249,10 @@ def cmd_prompts_list(args: argparse.Namespace) -> int:
         print(json.dumps(rows, indent=2, ensure_ascii=False))
         return 0
     for r in rows:
-        print(f"{r['name']}  [{r['source']}, {r['count']} prompt{'s' if r['count'] != 1 else ''}]")
+        meta = f"[{r['source']}, {r['count']} prompt{'s' if r['count'] != 1 else ''}]"
+        print(f"{ui.style(r['name'], 'bold', 'cyan')}  {ui.style(meta, 'dim')}")
         print(f"  {r['description']}")
-    print("Use one with `journal write --prompt <name>`; add your own with `journal config set prompts.<name> \"…\"`.")
+    print(ui.style("Use one with `journal write --prompt <name>`; add your own with `journal config set prompts.<name> \"…\"`.", "dim"))
     return 0
 
 
@@ -261,7 +271,7 @@ def cmd_prompts_show(args: argparse.Namespace) -> int:
     if args.json:
         print(json.dumps(row, indent=2, ensure_ascii=False))
         return 0
-    print(f"{row['name']}  [{row['source']}]\n{row['description']}\n")
+    print(f"{ui.style(row['name'], 'bold', 'cyan')}  {ui.style('[' + row['source'] + ']', 'dim')}\n{row['description']}\n")
     for i, text in enumerate(row["prompts"], 1):
-        print(f"{i}. {text}\n")
+        print(f"{ui.style(f'{i}.', 'bold', 'magenta')} {text}\n")
     return 0

@@ -6,7 +6,8 @@ You are driving a person's private journal. These rules keep it safe and keep yo
    <command> --help` has the flags; `journal config explain` and `journal prompts list` explain
    settings and prompt sets.
 2. **Use `--json`** whenever you will parse the output. Plain output is for people. Dates you
-   pass should be ISO.
+   pass should be ISO. Output piped to you is never styled (no color codes) and `journal docs`
+   gives you raw markdown; only a person's terminal gets the styled version.
 3. **Never edit files in the data directory yourself** (not entries, not the git history). Use
    `journal new/add/edit/tag/delete`. They stamp `updated`, keep history, and avoid corrupting
    frontmatter. `journal path` shows where the data lives (for information only).

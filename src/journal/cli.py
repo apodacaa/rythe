@@ -53,7 +53,7 @@ import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import configcmd, docs, ingest, prompts, render, setup, store, transcribe
+from . import configcmd, docs, ingest, prompts, render, setup, store, transcribe, ui
 from .config import config_path, load_config
 from .dates import (
     parse_date as _parse_date,
@@ -178,7 +178,7 @@ def cmd_new(args: argparse.Namespace) -> int:
     if args.json:
         print(json.dumps(_entry_to_dict(entry), indent=2))
     else:
-        print(f"created {entry.id}")
+        print(render.done("created", entry.id))
         if _interactive():
             _print_resurfaced(entry)
             _print_setup_tip()
@@ -232,7 +232,7 @@ def cmd_list(args: argparse.Namespace) -> int:
         for e in entries:
             preview = _preview(e)
             suffix = f"  {preview}" if preview else ""
-            print(f"{e.id}  [{e.source}]{suffix}")
+            print(render.listing_line(e, preview))
     return 0
 
 
@@ -353,11 +353,11 @@ def cmd_on_this_day(args: argparse.Namespace) -> int:
     last_year = None
     for e in entries:
         if e.created.year != last_year:
-            print(f"{e.created.year}:")
+            print(ui.style(f"{e.created.year}:", "bold", "cyan"))
             last_year = e.created.year
         preview = _preview(e)
         suffix = f"  {preview}" if preview else ""
-        print(f"  {e.id}  [{e.source}]{suffix}")
+        print(render.listing_line(e, preview, indent="  "))
     return 0
 
 
@@ -393,9 +393,9 @@ def cmd_search(args: argparse.Namespace) -> int:
         for e, matches in results:
             preview = _preview(e)
             suffix = f"  {preview}" if preview else ""
-            print(f"{e.id}{suffix}:")
+            print(f"{render.entry_id(e.id)}{suffix}:")
             for line in matches:
-                print(f"  {line}")
+                print("  " + render.highlight(line, args.query, regex=args.regex))
     return 0
 
 
@@ -429,10 +429,10 @@ def cmd_status(args: argparse.Namespace) -> int:
     when = "today" if days == 0 else "yesterday" if days == 1 else f"{days} days ago"
     last = datetime.fromisoformat(status["last_entry_at"])
     n = status["week_count"]
-    print(f"last entry: {when} ({last:%a %b} {last.day})")
-    print(f"this week: {n} {'entry' if n == 1 else 'entries'}")
+    print(f"{ui.style('last entry:', 'bold')} {ui.style(when, 'bold', 'cyan')} {ui.style(f'({last:%a %b} {last.day})', 'dim')}")
+    print(f"{ui.style('this week:', 'bold')} {ui.style(str(n), 'bold', 'cyan')} {'entry' if n == 1 else 'entries'}")
     if status["on_this_day_count"]:
-        print(f"on this day: {status['on_this_day_count']} from past years")
+        print(f"{ui.style('on this day:', 'bold')} {ui.style(str(status['on_this_day_count']), 'bold', 'cyan')} from past years")
     return 0
 
 
@@ -498,7 +498,7 @@ def cmd_tags(args: argparse.Namespace) -> int:
         print(json.dumps(dict(ordered), indent=2))
     else:
         for tag, count in ordered:
-            print(f"{count:>4}  #{tag}")
+            print(render.tag_counts_line(count, tag))
     return 0
 
 
@@ -513,7 +513,7 @@ def cmd_tag(args: argparse.Namespace) -> int:
     if args.json:
         print(json.dumps(_entry_to_dict(entry), indent=2))
     else:
-        print(f"tagged {entry.id}")
+        print(render.done("tagged", entry.id))
     return 0
 
 
@@ -528,7 +528,7 @@ def cmd_delete(args: argparse.Namespace) -> int:
     if args.json:
         print(json.dumps({"id": args.id, "trashed_at": str(trashed)}, indent=2))
     else:
-        print(f"deleted {args.id} (moved to {trashed}, not purged)")
+        print(render.done("deleted", args.id, f" (moved to {trashed}, not purged)"))
     return 0
 
 
@@ -564,14 +564,14 @@ def cmd_edit(args: argparse.Namespace) -> int:
         tmp_path.unlink(missing_ok=True)
 
     if after == entry.body:
-        print(f"edited {args.id} (no changes)")
+        print(render.done("edited", args.id, " (no changes)"))
         return 0
     if not after.strip():
         print(f"journal: entry left empty, so it was not changed (use `journal delete {args.id}`)", file=sys.stderr)
         return 1
 
     store.update_body(args.id, after, _now())
-    print(f"edited {args.id}")
+    print(render.done("edited", args.id))
     return 0
 
 
@@ -662,9 +662,14 @@ def cmd_model_list(args: argparse.Namespace) -> int:
         print(json.dumps(models, indent=2))
     else:
         for m in models:
+            name = m["name"]
             mark = "x" if m["downloaded"] else " "
-            rec = " (recommended)" if m["name"] == transcribe.RECOMMENDED_MODEL else ""
-            print(f"[{mark}] {m['name']:8} {transcribe.format_size(m['name']):<8} {m['note']}{rec}")
+            rec = " (recommended)" if name == transcribe.RECOMMENDED_MODEL else ""
+            badge = ui.style(f"[{mark}]", "green" if m["downloaded"] else "dim")
+            print(
+                f"{badge} {ui.style(f'{name:8}', 'bold')} {transcribe.format_size(name):<8} "
+                f"{ui.style(m['note'], 'dim')}{ui.style(rec, 'green')}"
+            )
         print("[x] = already downloaded. Fetch one with `journal model download <name>`.")
     return 0
 
@@ -893,6 +898,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_docs.add_argument("--list", action="store_true", help="list the topics")
     p_docs.add_argument("--all", action="store_true", help="print every topic")
     p_docs.add_argument("--json", action="store_true")
+    p_docs.add_argument("--no-pager", action="store_true")
     p_docs.set_defaults(func=docs.cmd_docs)
 
     p_setup = sub.add_parser(
@@ -1003,6 +1009,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
+        ui.configure(load_config().appearance.color)
         if args.command is None:
             return cmd_write(args)
         return args.func(args)

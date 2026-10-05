@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from journal import setup, settings
+from journal import setup, settings, transcribe, ui
 from journal.config import config_path, load_raw
 from journal.cli import main
 
@@ -51,7 +51,9 @@ def test_check_counts_entries(capsys):
 def test_plain_check_output(capsys, monkeypatch):
     monkeypatch.setattr("journal.setup.shutil.which", lambda name: None if name == "fzf" else f"/usr/bin/{name}")
     out = run(capsys, "setup", "--check")[1]
-    assert "Your setup:" in out and "missing  fzf" in out and "ok       git" in out
+    assert "Your setup" in out
+    assert any("missing" in l and "fzf" in l for l in out.splitlines())
+    assert any(" ok " in l and "git" in l for l in out.splitlines())
     assert "journal folder:" in out and "not created yet" in out
 
 
@@ -101,7 +103,8 @@ def test_changing_one_answer_writes_only_that_key(home):
     s = Session("", "n", "", "", "y", "")  # history off, no voice memos, then save
     assert s.run() == 0
     assert load_raw() == {"history": {"enabled": False}}
-    assert "history.enabled: true -> false" in s.text
+    line = next(l for l in s.text.splitlines() if "history.enabled" in l and "true" in l)
+    assert "false" in line and ui.glyph("arrow") in line
 
 
 def test_bad_folder_is_asked_again_then_saved_with_move_hint(home):
@@ -114,7 +117,7 @@ def test_bad_folder_is_asked_again_then_saved_with_move_hint(home):
     assert s.run() == 0
     assert "must be an absolute path" in s.text
     assert load_raw() == {"storage": {"dir": str(new)}}
-    assert "(1 entries)" in s.text
+    assert "(1 entry)" in s.text
     assert f"mv {home}/.local/share/journal {new}" in s.text  # existing entries are not moved for you
 
 
@@ -305,7 +308,7 @@ def test_model_list_in_the_wizard_explains_each_model_and_marks_downloaded(home)
     for name, note in transcribe.MODEL_NOTES.items():
         assert note in s.text, name
     assert "[recommended]" in s.text and "[downloaded]" in s.text
-    line = next(t for t in s.said if t.strip().startswith("base"))
+    line = next(l for l in s.text.splitlines() if "base" in l and transcribe.MODEL_NOTES["base"] in l)
     assert "[downloaded]" in line
 
 
@@ -313,3 +316,34 @@ def test_declining_a_download_says_how_to_do_it_later(home):
     s = Session("", "", "", "y", "medium", "", "n", "")
     s.run(download=_downloads()[1])
     assert "journal model download medium" in s.text
+
+
+def test_wizard_is_styled_when_color_is_on_and_plain_text_underneath(home):
+    ui.set_color(True)
+    s = Session("", "n", "", "", "y", "")
+    s.run()
+    assert "\x1b[" in s.text  # styled
+    plain = ui.strip_ansi(s.text)
+    assert "J O U R N A L   S E T U P" in plain and "1/5  WHERE SHOULD YOUR JOURNAL LIVE?" in plain
+    assert "5/5  WRITING PROMPTS" in plain and "You're set" in plain
+    assert "Saved to" in plain
+
+    lines = plain.splitlines()
+    top = next(i for i, l in enumerate(lines) if "Here's what will change" in l)
+    bottom = next(i for i in range(top, len(lines)) if lines[i].startswith(ui.glyph("box")[2]))
+    assert len({len(l) for l in lines[top : bottom + 1]}) == 1  # the summary box is a clean rectangle
+
+
+def test_wizard_has_no_escape_codes_when_color_is_off(home):
+    ui.set_color(False)
+    s = Session("", "", "", "", "")
+    s.run()
+    assert "\x1b" not in s.text and "\x01" not in s.text
+
+
+def test_all_five_steps_are_numbered_in_order(home):
+    s = Session("", "", "", "", "")
+    s.run()
+    plain = s.text
+    positions = [plain.index(f"{n}/5") for n in range(1, 6)]
+    assert positions == sorted(positions)

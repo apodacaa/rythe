@@ -23,6 +23,9 @@ $ journal review               # read your week, then write a reflection
   `journal review` are all built in.
 - **It's plain files.** Entries are `.txt` files you can read, grep and back up without this
   tool, in a folder you control.
+- **It looks the part.** On a terminal you get bold headers, a colored guided setup, highlighted
+  tags and search matches, and a rendered built-in guide. Colors come from your terminal's own
+  palette, so they follow your theme, and they switch off by themselves when output is piped.
 - **People and agents both can drive it.** Every command has `--help` and most have `--json`, and
   the tool documents itself (see [Documentation](#documentation)).
 
@@ -133,6 +136,9 @@ journal config explain history.enabled
 journal config set history.enabled false
 journal config unset history.enabled
 ```
+
+Appearance: colors and bold are on for terminals and off when piped, with `--json`, or when
+`NO_COLOR` is set. Force a choice with `journal config set appearance.color always` (or `never`).
 
 The file is `~/.config/journal/config.toml` (override with `JOURNAL_CONFIG`). Entries live in
 `~/.local/share/journal` unless you set `storage.dir` (see [Getting started](#getting-started)).
