@@ -217,3 +217,66 @@ def test_docs_json_is_never_styled(capsys, monkeypatch):
     main(["docs", "config", "--json"])
     out = capsys.readouterr().out
     assert "\x1b" not in out and json.loads(out)["topics"] == ["config"]
+
+
+HELP_ARGVS = [[], ["add"], ["new"], ["config"], ["config", "set"], ["prompts"], ["ingest"], ["docs"], ["setup"], ["review"]]
+
+
+def _help(argv, capsys):
+    with pytest.raises(SystemExit) as exit_info:
+        main([*argv, "--help"])
+    assert exit_info.value.code == 0
+    return capsys.readouterr().out
+
+
+@pytest.mark.parametrize("argv", HELP_ARGVS, ids=lambda a: " ".join(a) or "journal")
+def test_styled_help_only_adds_escape_codes_never_changes_the_text(argv, capsys, monkeypatch):
+    plain = _help(argv, capsys)
+    assert "\x1b" not in plain and "usage: journal" in plain
+
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    colored = _help(argv, capsys)
+    assert "\x1b[" in colored
+    assert ui.strip_ansi(colored) == plain  # same words, same layout
+
+
+def test_styled_help_picks_out_headings_commands_flags_and_examples(capsys, monkeypatch):
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    top = _help([], capsys)
+    assert ui.style("usage:", "bold", "cyan") in top
+    assert ui.style("positional arguments:", "bold", "cyan") in top
+    assert ui.style("add", "bold", "cyan") in top  # a command name in the list
+    assert ui.style("Examples:", "bold", "cyan") in top
+    assert ui.style("journal status", "bold") in top  # an example command...
+    assert any(ui.style(line, "dim") in top for line in ("# last entry, entries this week; also --json",))  # ...and its comment
+
+    sub = _help(["add"], capsys)
+    # (how argparse spells a flag with a value differs between Python versions; --json is stable)
+    assert ui.style("--json", "bold") in sub and ui.style("options:", "bold", "cyan") in sub
+
+
+def test_every_subcommand_help_is_styled_too(capsys, monkeypatch):
+    """add_subparsers must hand the styled parser class down to every sub-command."""
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    for argv in (["config", "set"], ["prompts", "show"], ["ingest", "audio"], ["model", "download"]):
+        assert "\x1b[" in _help(argv, capsys), argv
+
+
+def test_help_follows_the_color_setting_and_no_color(capsys, monkeypatch):
+    main(["config", "set", "appearance.color", "always"])
+    capsys.readouterr()
+    assert "\x1b[" in _help(["add"], capsys)  # the setting applies to --help, not only to commands
+
+    monkeypatch.setenv("NO_COLOR", "1")
+    main(["config", "set", "appearance.color", "auto"])
+    capsys.readouterr()
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    assert "\x1b" not in _help(["add"], capsys)
+
+
+def test_help_still_works_when_the_config_file_is_unreadable(capsys):
+    from journal.config import config_path
+
+    config_path().parent.mkdir(parents=True, exist_ok=True)
+    config_path().write_text("[appearance\n")
+    assert "usage: journal" in _help([], capsys)
