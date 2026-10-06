@@ -82,5 +82,6 @@ users back it up however they like. Don't add backup or version-control features
 - Install/reinstall after code changes: `uv tool install --editable .` (puts `journal` on
   `~/.local/bin`, which is already on PATH — this project's own `bin/` is not used).
 - Tests: `uv run pytest`.
-- Git: local only for now, no GitHub remote. Work on a branch per milestone; the user decides
-  when to merge. Don't commit straight to `main`.
+- Git: the remote is `github.com/apodacaa/journal` (private). Work lands on `main` through a pull
+  request: branch, commit, push, `gh pr create`. The user decides when to merge (`gh pr merge
+  --merge`, keeping each commit). Don't commit straight to `main`.

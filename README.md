@@ -34,7 +34,7 @@ $ journal review               # read your week, then write a reflection
 Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 
 ```
-cd path/to/journal           # a checkout of this repository
+git clone https://github.com/apodacaa/journal && cd journal
 uv tool install .            # puts `journal` on your PATH (use --editable while developing)
 ```
 
