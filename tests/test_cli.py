@@ -716,3 +716,52 @@ def test_without_a_pager_or_when_it_cannot_start_the_text_is_printed(on_a_termin
     monkeypatch.setattr("journal.cli.subprocess.run", cannot_start)
     _output("fallback")
     assert capsys.readouterr().out == "fallback\n"
+
+
+# The editor-file naming contract: editor configs recognise journal writing by this pattern
+# (an autocmd matching `*/journal-new-*.txt`). Renaming these files breaks them silently.
+EDITOR_FILE_PATTERN = "*/journal-new-*.txt"
+
+
+def test_new_entry_draft_given_to_the_editor_matches_the_contract(capsys, monkeypatch):
+    from fnmatch import fnmatch
+
+    seen = []
+
+    def editor(command):
+        seen.append(command[-1])
+        Path(command[-1]).write_text("hello\n")
+        return 0
+
+    monkeypatch.setattr("journal.cli.subprocess.call", editor)
+    assert main(["write"]) == 0
+    assert fnmatch(seen[0], EDITOR_FILE_PATTERN), seen[0]
+    assert Path(seen[0]).parent.name == "drafts"
+
+
+def test_edit_copy_given_to_the_editor_matches_the_contract(capsys, monkeypatch):
+    from fnmatch import fnmatch
+
+    main(["new", "--text", "before", "--json"])
+    entry_id = json.loads(capsys.readouterr().out)["id"]
+    seen = []
+    monkeypatch.setattr("journal.cli.subprocess.call", lambda command: seen.append(command[-1]) or 0)
+
+    main(["edit", entry_id])
+    assert fnmatch(seen[0], EDITOR_FILE_PATTERN), seen[0]
+    assert f"journal-new-edit-{entry_id}-" in Path(seen[0]).name
+
+
+def test_a_draft_saved_under_the_old_name_still_resumes(capsys, monkeypatch, journal_dir):
+    old = journal_dir / "drafts" / "20261001T120000000000.txt"
+    old.parent.mkdir(parents=True)
+    old.write_text("left over from an older version\n")
+    seen = []
+
+    def editor(command):
+        seen.append(Path(command[-1]).read_text())
+        return 0
+
+    monkeypatch.setattr("journal.cli.subprocess.call", editor)
+    assert main(["write", ]) == 0
+    assert seen == ["left over from an older version\n"] and not old.exists()

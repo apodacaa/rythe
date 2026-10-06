@@ -58,9 +58,15 @@ def list_drafts() -> list[Path]:
     return sorted(root.glob("*.txt")) if root.exists() else []
 
 
+# Files the editor is opened on are named `journal-new-*.txt` (drafts here, edit copies in cli).
+# Treat that as a contract: editor configs match journal writing by this name (e.g. to turn off
+# completion or capital-letter spellcheck), and tests pin it.
+DRAFT_PREFIX = "journal-new-"
+
+
 def new_draft_path() -> Path:
     drafts_root().mkdir(parents=True, exist_ok=True)
-    return drafts_root() / f"{datetime.now().strftime('%Y%m%dT%H%M%S%f')}.txt"
+    return drafts_root() / f"{DRAFT_PREFIX}{datetime.now().strftime('%Y%m%dT%H%M%S%f')}.txt"
 
 
 def _entry_path(entry_id: str) -> Path:
