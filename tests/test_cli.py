@@ -716,3 +716,65 @@ def test_without_a_pager_or_when_it_cannot_start_the_text_is_printed(on_a_termin
     monkeypatch.setattr("journal.cli.subprocess.run", cannot_start)
     _output("fallback")
     assert capsys.readouterr().out == "fallback\n"
+
+
+def _new(capsys, text="original text"):
+    main(["new", "--text", text, "--json"])
+    return json.loads(capsys.readouterr().out)["id"]
+
+
+def test_edit_stdin_replaces_the_text_without_an_editor(capsys, monkeypatch):
+    import io
+
+    entry_id = _new(capsys)
+    monkeypatch.setattr("journal.cli.subprocess.call", lambda command: pytest.fail("editor opened"))
+    monkeypatch.setattr("sys.stdin", io.StringIO("rewritten from a pipe #piped"))
+
+    assert main(["edit", entry_id, "--stdin", "--json"]) == 0
+    edited = json.loads(capsys.readouterr().out)
+    assert edited["body"] == "rewritten from a pipe #piped\n" and edited["tags"] == ["piped"]
+    assert edited["updated"] is not None
+
+
+def test_edit_text_flag_and_plain_output(capsys):
+    entry_id = _new(capsys)
+    assert main(["edit", entry_id, "--text", "via --text"]) == 0
+    assert capsys.readouterr().out.strip() == f"edited {entry_id}"
+    main(["show", entry_id, "--json"])
+    assert json.loads(capsys.readouterr().out)["body"] == "via --text\n"
+
+
+def test_edit_stdin_with_the_same_text_is_not_a_change(capsys, monkeypatch):
+    import io
+
+    entry_id = _new(capsys, "same\n")
+    monkeypatch.setattr("sys.stdin", io.StringIO("same"))  # missing final newline is not a change
+    assert main(["edit", entry_id, "--stdin", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["updated"] is None
+
+
+def test_edit_stdin_refuses_empty_text_and_needs_an_explicit_id(capsys, monkeypatch):
+    import io
+
+    entry_id = _new(capsys)
+    monkeypatch.setattr("sys.stdin", io.StringIO("   \n"))
+    assert main(["edit", entry_id, "--stdin"]) == 1
+    assert "journal delete" in capsys.readouterr().err
+
+    assert main(["edit", "--text", "no id given"]) == 1
+    assert "explicit entry id" in capsys.readouterr().err
+    main(["show", entry_id, "--json"])
+    assert json.loads(capsys.readouterr().out)["body"].strip() == "original text"
+
+
+def test_edit_stdin_accepts_refs_and_reports_unknown_ones(capsys):
+    _new(capsys, "first")
+    assert main(["edit", "last", "--text", "changed via last"]) == 0
+    capsys.readouterr()
+    assert main(["edit", "1999-01", "--text", "x"]) == 2
+
+
+def test_edit_stdin_and_text_cannot_be_combined(capsys):
+    entry_id = _new(capsys)
+    with pytest.raises(SystemExit):
+        main(["edit", entry_id, "--stdin", "--text", "both"])

@@ -12,6 +12,7 @@ Examples:
   journal read --since 2026-09-01 --tag work  # any range or filter; pages through $PAGER
   journal show last                           # also: today, or any unique prefix like 2026-09-30
   journal edit                                # pick an entry with fzf (or edit the last one)
+  echo "new text" | journal edit last --stdin # replace an entry's text without an editor
   journal show 2026-09-30T164608
   journal search "coffee" --tag morning
   journal search --tag work                  # tag filter alone, no text query
@@ -551,7 +552,12 @@ def _editor_command() -> list[str]:
 
 
 def cmd_edit(args: argparse.Namespace) -> int:
-    if (code := _resolve_args(args, may_pick=True)) is not None:
+    non_interactive = args.stdin or args.text is not None
+    if non_interactive and args.id is None:
+        # No picker and no "last" default here: a script must say exactly which entry it changes.
+        print("journal: --stdin/--text need an explicit entry id (or `last`)", file=sys.stderr)
+        return 1
+    if (code := _resolve_args(args, may_pick=not non_interactive)) is not None:
         return code
     try:
         entry = store.get(args.id)
@@ -559,26 +565,37 @@ def cmd_edit(args: argparse.Namespace) -> int:
         print(f"journal: no entry {args.id!r}", file=sys.stderr)
         return 2
 
-    # The editor only ever sees the body, never the frontmatter, so an edit can't corrupt it.
-    fd, tmp_name = tempfile.mkstemp(suffix=".txt", prefix="journal-edit-")
-    os.close(fd)
-    tmp_path = Path(tmp_name)
-    try:
-        tmp_path.write_text(entry.body)
-        subprocess.call(_editor_command() + [str(tmp_path)])
-        after = tmp_path.read_text()
-    finally:
-        tmp_path.unlink(missing_ok=True)
+    if non_interactive:
+        after = args.text if args.text is not None else sys.stdin.read()
+        if after and not after.endswith("\n"):
+            after += "\n"  # stored bodies end with a newline; don't count its absence as a change
+    else:
+        # The editor only ever sees the body, never the frontmatter, so an edit can't corrupt it.
+        fd, tmp_name = tempfile.mkstemp(suffix=".txt", prefix="journal-edit-")
+        os.close(fd)
+        tmp_path = Path(tmp_name)
+        try:
+            tmp_path.write_text(entry.body)
+            subprocess.call(_editor_command() + [str(tmp_path)])
+            after = tmp_path.read_text()
+        finally:
+            tmp_path.unlink(missing_ok=True)
 
     if after == entry.body:
-        print(render.done("edited", args.id, " (no changes)"))
+        if args.json:
+            print(json.dumps(_entry_to_dict(entry), indent=2))
+        else:
+            print(render.done("edited", args.id, " (no changes)"))
         return 0
     if not after.strip():
         print(f"journal: entry left empty, so it was not changed (use `journal delete {args.id}`)", file=sys.stderr)
         return 1
 
-    store.update_body(args.id, after, _now())
-    print(render.done("edited", args.id))
+    entry = store.update_body(args.id, after, _now())
+    if args.json:
+        print(json.dumps(_entry_to_dict(entry), indent=2))
+    else:
+        print(render.done("edited", args.id))
     return 0
 
 
@@ -946,10 +963,17 @@ def build_parser() -> argparse.ArgumentParser:
             "can't corrupt it, and `updated` is stamped only if the text actually changed. "
             "Emptying the body is refused (use `journal delete`). The id can be a full id, "
             "`last`, `today`, or a unique prefix; leave it off to pick with fzf (or fall back "
-            "to the last entry)."
+            "to the last entry). For scripts, editors and agents, --stdin or --text replace the "
+            "text without opening an editor; they need an explicit id."
         ),
     )
     p_edit.add_argument("id", nargs="?", help="id, `last`, `today`, or a unique prefix; omit to pick with fzf")
+    edit_source = p_edit.add_mutually_exclusive_group()
+    edit_source.add_argument(
+        "--stdin", action="store_true", help="replace the entry's text with stdin instead of opening $EDITOR"
+    )
+    edit_source.add_argument("--text", help="replace the entry's text with this instead of opening $EDITOR")
+    p_edit.add_argument("--json", action="store_true")
     p_edit.set_defaults(func=cmd_edit)
 
     p_path = sub.add_parser("path", help="print the data directory")
