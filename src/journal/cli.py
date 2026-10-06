@@ -171,6 +171,9 @@ def cmd_new(args: argparse.Namespace) -> int:
         body = sys.stdin.read()
     else:
         body = args.text
+    if not body.strip():
+        print("journal: no entry created (empty)", file=sys.stderr)
+        return 1
     if getattr(args, "ensure_tags", None):
         body = _with_tags(body, args.ensure_tags)
     entry = store.create(created=created, body=body, source=args.source, title=args.title or "")

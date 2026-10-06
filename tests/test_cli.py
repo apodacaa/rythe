@@ -237,6 +237,19 @@ def test_new_reads_stdin_when_no_text(monkeypatch, capsys):
     assert shown["body"].strip() == "typed from stdin"
 
 
+@pytest.mark.parametrize("args, stdin", [(["new"], ""), (["new"], " \n\n"), (["new", "--text", "  "], "")])
+def test_new_refuses_empty_text_without_creating_entry(args, stdin, monkeypatch, capsys):
+    import io
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(stdin))
+    assert main(args + ["--json"]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "no entry created" in captured.err
+    assert main(["list", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out) == []
+
+
 def test_show_missing_entry_returns_exit_code_2(capsys):
     assert main(["show", "2026-01-01T000000"]) == 2
 
