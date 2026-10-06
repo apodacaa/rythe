@@ -560,7 +560,8 @@ def cmd_edit(args: argparse.Namespace) -> int:
         return 2
 
     # The editor only ever sees the body, never the frontmatter, so an edit can't corrupt it.
-    fd, tmp_name = tempfile.mkstemp(suffix=".txt", prefix="journal-edit-")
+    # Named journal-new-edit-… so it matches the same `journal-new-*.txt` contract as drafts.
+    fd, tmp_name = tempfile.mkstemp(suffix=".txt", prefix=f"{store.DRAFT_PREFIX}edit-{entry.id}-")
     os.close(fd)
     tmp_path = Path(tmp_name)
     try:

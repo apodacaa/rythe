@@ -46,6 +46,10 @@ get swept in on demand via the `journal-sweep` skill, which transcribes locally 
 - **A bare `journal` is a blank page.** Prompts are always opt-in (`--prompt`).
 - **Never lose writing.** Editor drafts live in `<data>/drafts` until the entry is saved;
   `--at` is parsed before the editor opens; edits show the editor only the body.
+- **Editor file names are a contract.** Every file the editor is opened on is named
+  `journal-new-*.txt` (drafts `<data>/drafts/journal-new-<time>.txt`, edit copies
+  `journal-new-edit-<id>-*.txt` in the temp dir). Other tools match journal writing by that name,
+  so don't rename them; `tests/test_cli.py` pins them.
 
 ## Data lives outside this repo
 

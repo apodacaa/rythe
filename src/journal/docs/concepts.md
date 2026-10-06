@@ -37,7 +37,8 @@ same id exits 3 unless `--force` is given.
 
 ## Safety nets
 
-- **Drafts:** the editor works on a file in `<data>/drafts`. It's deleted only after the entry is
+- **Drafts:** the editor works on a file in `<data>/drafts` (named `journal-new-<time>.txt`; editor
+  configs can match journal writing by the `journal-new-*.txt` name, which edits use too). It's deleted only after the entry is
   saved. If anything goes wrong (a crash, a killed editor, a failed save), the next `journal
   write` resumes the draft.
 - **Trash:** `journal delete` moves an entry (and its audio) to `<data>/.trash`; nothing is
