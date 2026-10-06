@@ -10,7 +10,8 @@ You are driving a person's private journal. These rules keep it safe and keep yo
    gives you raw markdown; only a person's terminal gets the styled version.
 3. **Never edit files in the data directory yourself** (entries, audio or anything else). Use
    `journal new/add/edit/tag/delete`. They stamp `updated` and avoid corrupting
-   frontmatter. `journal path` shows where the data lives (for information only).
+   frontmatter. To change an entry's text use `journal edit <id> --stdin` (or `--text`), never
+   plain `journal edit`, which opens an editor. `journal path` shows where the data lives (for information only).
 4. **Don't read the journal unless asked.** It's private. When you do, use the narrowest query
    (`list --since … --tag …`, `search`), not a dump of everything.
 5. **Writing as the person:** `journal write` and `journal review` open an editor and are for the

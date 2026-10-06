@@ -6,7 +6,7 @@ use `--json`.
 
 ## Entry object
 
-Returned by `new`, `add`, `show`, `tag`, `ingest audio|text` and inside `list`:
+Returned by `new`, `add`, `show`, `tag`, `edit`, `ingest audio|text` and inside `list`:
 
 ```
 {
