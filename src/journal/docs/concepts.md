@@ -54,7 +54,11 @@ same id exits 3 unless `--force` is given.
 - After a new entry is saved on a terminal, one older entry is shown (same day in a past year,
   else a month ago, else a week ago). Setting `resurface.enabled` controls it.
 - `journal review` shows the period and then opens the editor with reflection questions. The
-  result is saved as a titled entry tagged `#review`.
+  result is saved as a titled entry tagged `#review`. Editor plugins and other clients do the
+  same in two steps: `review --json` gives the period, title and question without saving
+  anything, and `review --stdin` saves the reflection with that title and tag.
+- `journal prompts pick [SET]` prints the prompt `new --prompt` would show today; the choice is
+  seeded by the date, so it's the same all day.
 - `journal status` says when you last wrote and how many entries this week (also `--json`), cheap
   enough for a shell prompt or a scheduler.
 

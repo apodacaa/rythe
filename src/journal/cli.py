@@ -452,21 +452,43 @@ def cmd_review(args: argparse.Namespace) -> int:
     custom = bool(args.since or args.until)
     since = _parse_since(args.since) if args.since else _parse_since((today - timedelta(days=6)).isoformat())
     until = _parse_until(args.until) if args.until else None
-    if not args.no_read:
-        # Past reviews are left out so a review reads the days themselves, not earlier summaries.
-        entries = store.list_entries(since=since, until=until, exclude_tags=["review"])
-        if entries:
-            entries.reverse()
-            _output(render.render_entries(entries, show_id=False), no_pager=args.no_pager)
-        else:
-            print("nothing written in that period", file=sys.stderr)
     first = since.date()
     last = until.date() if until else today
     span = f"{first:%b} {first.day} – {last:%b} {last.day}"
+    title = f"{'Review of' if custom else 'Week of'} {span}"
+
+    def period() -> list[Entry]:
+        # Past reviews are left out so a review reads the days themselves, not earlier summaries.
+        entries = store.list_entries(since=since, until=until, exclude_tags=["review"])
+        entries.reverse()
+        return entries
+
+    if args.stdin:
+        return cmd_new(
+            argparse.Namespace(
+                at=None, title=title, source="cli", text=sys.stdin.read(), editor=False,
+                prompt=None, ensure_tags=["review"], json=args.json,
+            )
+        )
+    if args.json:
+        print(json.dumps({
+            "since": since.isoformat(),
+            "until": until.isoformat() if until else None,
+            "title": title,
+            "prompt": prompts.pick("review", today, load_config().prompts),
+            "entries": [_entry_to_dict(e) for e in period()],
+        }, indent=2, ensure_ascii=False))
+        return 0
+    if not args.no_read:
+        entries = period()
+        if entries:
+            _output(render.render_entries(entries, show_id=False), no_pager=args.no_pager)
+        else:
+            print("nothing written in that period", file=sys.stderr)
     return cmd_new(
         argparse.Namespace(
             at=None,
-            title=f"{'Review of' if custom else 'Week of'} {span}",
+            title=title,
             source="cli",
             text=None,
             editor=True,
@@ -475,6 +497,25 @@ def cmd_review(args: argparse.Namespace) -> int:
             json=False,
         )
     )
+
+
+def cmd_prompts_pick(args: argparse.Namespace) -> int:
+    day = _parse_date(args.date) if args.date else _now().date()
+    extra = load_config().prompts
+    if args.name not in prompts.available(extra):
+        sets = ", ".join(sorted(prompts.available(extra)))
+        print(f"journal: no prompt set {args.name!r} (available: {sets})", file=sys.stderr)
+        return 2
+    try:
+        text = prompts.pick(args.name, day, extra)
+    except ValueError as e:
+        print(f"journal: {e}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps({"name": args.name, "date": day.isoformat(), "prompt": text}, indent=2, ensure_ascii=False))
+    else:
+        print(text)
+    return 0
 
 
 def cmd_setup(args: argparse.Namespace) -> int:
@@ -862,6 +903,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_review.add_argument("--until", metavar="ISO")
     p_review.add_argument("--no-read", action="store_true", help="skip showing the period first")
     p_review.add_argument("--no-pager", action="store_true")
+    p_review.add_argument(
+        "--json",
+        action="store_true",
+        help="print the review as data (period, title, question, entries) instead of opening the editor",
+    )
+    p_review.add_argument(
+        "--stdin",
+        action="store_true",
+        help="save the reflection from stdin (titled, tagged #review) instead of opening the editor",
+    )
     p_review.set_defaults(func=cmd_review)
 
     p_config = sub.add_parser(
@@ -916,6 +967,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_pr_show.add_argument("name")
     p_pr_show.add_argument("--json", action="store_true")
     p_pr_show.set_defaults(func=configcmd.cmd_prompts_show)
+    p_pr_pick = prompts_sub.add_parser(
+        "pick", help="the prompt `new --prompt` would show on a date (the choice is seeded by the date)"
+    )
+    p_pr_pick.add_argument("name", nargs="?", default="today", help="prompt set (default: today)")
+    p_pr_pick.add_argument("--date", metavar="YYYY-MM-DD", help="default: today")
+    p_pr_pick.add_argument("--json", action="store_true")
+    p_pr_pick.set_defaults(func=cmd_prompts_pick)
 
     p_docs = sub.add_parser(
         "docs",

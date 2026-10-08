@@ -43,7 +43,12 @@ Returned by `new`, `add`, `show`, `tag`, `edit`, `ingest audio|text` and inside 
   without it) when `found` is false.
 - `model list --json`: `[{"name", "file", "downloaded", "approx_mb", "note"}]` (`note` says what the model is like).
 - `prompts list --json`: `[{"name", "source", "count", "description"}]`;
-  `prompts show --json`: `{"name", "source", "description", "prompts": []}`.
+  `prompts show --json`: `{"name", "source", "description", "prompts": []}`;
+  `prompts pick --json`: `{"name", "date", "prompt"}` (the one prompt `new --prompt` shows that day).
+- `review --json`: `{"since", "until", "title", "prompt", "entries": [entry objects, oldest first,
+  past #review entries left out]}` (`until` is null for "up to now"); nothing is saved.
+  `review --stdin --json` saves stdin as the reflection (titled, tagged #review) and returns the
+  entry, as `new --json` does.
 
 `read`, `show` (without `--json`), `review`, `write` and `edit` are for people. There is no JSON
 form of `read`; use `list --json`.

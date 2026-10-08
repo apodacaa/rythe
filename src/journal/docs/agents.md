@@ -16,7 +16,8 @@ You are driving a person's private journal. These rules keep it safe and keep yo
    (`list --since … --tag …`, `search`), not a dump of everything.
 5. **Writing as the person:** `journal write` and `journal review` open an editor and are for the
    human. Don't call them. To create an entry on someone's behalf, use `journal add` or
-   `journal new --text`, and only when they asked.
+   `journal new --text`, and only when they asked. `review --json` only reads (it saves
+   nothing); `review --stdin` writes a reflection as the person, so the same rule applies.
 6. **Changing settings:** use `journal config set <key> <value>` and `journal config unset <key>`
    instead of editing `config.toml`. `config set` rewrites the file; if it had comments, they're
    saved to `config.toml.bak` and you should tell the person. Confirm with `journal config get`.
