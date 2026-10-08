@@ -106,7 +106,8 @@ def test_new_prints_resurfaced_line_only_on_a_terminal_without_json(capsys, monk
     assert "a week ago today: a week back" in out
 
     main(["new", "--text", "again", "--json"])
-    assert "ago today" not in capsys.readouterr().out
+    payload = json.loads(capsys.readouterr().out)  # only JSON: the human line isn't printed
+    assert payload["resurfaced"]["label"] == "a week ago today"  # it's carried in the JSON instead
 
     monkeypatch.setattr("journal.cli._interactive", lambda: False)
     main(["new", "--text", "piped"])

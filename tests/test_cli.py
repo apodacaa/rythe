@@ -250,6 +250,33 @@ def test_new_refuses_empty_text_without_creating_entry(args, stdin, monkeypatch,
     assert json.loads(capsys.readouterr().out) == []
 
 
+def test_new_json_includes_the_resurfaced_entry(capsys):
+    assert main(["new", "--at", "2026-09-24T08:00:00", "--text", "a week before", "--json"]) == 0
+    capsys.readouterr()
+    assert main(["new", "--at", "2026-10-01T09:00:00", "--text", "today", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["body"] == "today"
+    assert payload["resurfaced"]["label"] == "a week ago today"
+    assert payload["resurfaced"]["entry"]["id"] == "2026-09-24T080000"
+    assert payload["resurfaced"]["entry"]["body"].strip() == "a week before"
+
+
+def test_new_and_add_json_resurfaced_is_null_when_nothing_or_turned_off(capsys):
+    assert main(["new", "--at", "2026-09-24T08:00:00", "--text", "first", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["resurfaced"] is None
+    assert main(["config", "set", "resurface.enabled", "false"]) == 0
+    capsys.readouterr()
+    assert main(["add", "--at", "2026-10-01T09:00:00", "--json", "a", "week", "later"]) == 0
+    assert json.loads(capsys.readouterr().out)["resurfaced"] is None
+
+
+def test_show_json_has_no_resurfaced_key(capsys):
+    assert main(["new", "--text", "x", "--json"]) == 0
+    capsys.readouterr()
+    assert main(["show", "last", "--json"]) == 0
+    assert "resurfaced" not in json.loads(capsys.readouterr().out)
+
+
 def test_show_missing_entry_returns_exit_code_2(capsys):
     assert main(["show", "2026-01-01T000000"]) == 2
 

@@ -131,11 +131,16 @@ def _interactive() -> bool:
     return sys.stdout.isatty()
 
 
+def _resurfaced(entry: Entry) -> tuple[str, Entry] | None:
+    """The older entry to show after saving `entry`, if resurfacing is on."""
+    if not load_config().resurface.enabled:
+        return None
+    return store.resurface(entry.created.date())
+
+
 def _print_resurfaced(entry: Entry) -> None:
     """After saving, show one older entry — rereading is where a journal pays off."""
-    if not load_config().resurface.enabled:
-        return
-    found = store.resurface(entry.created.date())
+    found = _resurfaced(entry)
     if found:
         label, old = found
         print(f"{label}: {_preview(old, 70)}   (journal show {old.id})")
@@ -180,7 +185,11 @@ def cmd_new(args: argparse.Namespace) -> int:
     if draft is not None:
         draft.unlink(missing_ok=True)
     if args.json:
-        print(json.dumps(_entry_to_dict(entry), indent=2))
+        # The same older entry a person sees after saving, so clients can show it too.
+        found = _resurfaced(entry)
+        payload = _entry_to_dict(entry)
+        payload["resurfaced"] = {"label": found[0], "entry": _entry_to_dict(found[1])} if found else None
+        print(json.dumps(payload, indent=2))
     else:
         print(render.done("created", entry.id))
         if _interactive():
