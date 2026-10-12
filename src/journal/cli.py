@@ -141,10 +141,16 @@ def _print_resurfaced(entry: Entry) -> None:
         print(f"{label}: {_preview(old, 70)}   (journal show {old.id})")
 
 
+_in_setup = False  # True while the wizard runs, so an entry written from it doesn't advertise it
+
+
 def _print_setup_tip() -> None:
-    """After the very first entry, and only while there's no config file yet (running `journal
-    setup` or any `config set` creates it), point at the guided setup once. Stateless on purpose.
+    """After the very first entry, and only while there's no config file yet (saving a change in
+    `journal setup` or any `config set` creates it), point at the guided setup once. Stateless
+    on purpose.
     """
+    if _in_setup:
+        return
     if store.count_entries() == 1 and not config_path().exists():
         print("tip: `journal setup` walks you through the options (folder, voice memos).")
 
@@ -496,7 +502,12 @@ def cmd_setup(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 1
-    return setup.run_wizard(start_entry=lambda: cmd_write(argparse.Namespace()))
+    global _in_setup
+    _in_setup = True
+    try:
+        return setup.run_wizard(start_entry=lambda: cmd_write(argparse.Namespace()))
+    finally:
+        _in_setup = False
 
 
 def cmd_tags(args: argparse.Namespace) -> int:

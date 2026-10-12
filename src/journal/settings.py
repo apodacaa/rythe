@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass
+from typing import Callable
 
 from .transcribe import KNOWN_MODELS
 
@@ -24,6 +25,17 @@ class Setting:
     example: str
     choices: tuple[str, ...] = ()
     default_text: str = ""  # how to show a default that isn't a plain value (e.g. a path)
+    check: Callable[[str], str] | None = None  # extra validation: returns the value to store, or raises ValueError
+
+
+def _language(value: str) -> str:
+    code = value.strip().lower()
+    if code == "auto" or (code.isascii() and code.isalpha() and 2 <= len(code) <= 3):
+        return code
+    raise ValueError(
+        f"transcribe.language must be a short language code such as en, de or es, or `auto` to "
+        f"detect it each time (got {value!r})"
+    )
 
 
 SETTINGS: list[Setting] = [
@@ -34,7 +46,8 @@ SETTINGS: list[Setting] = [
         "The folder where entries (and audio, whisper models, drafts and trash) "
         "are stored. Absolute, or starting with ~. The $JOURNAL_DIR environment variable, if set, "
         "takes precedence. Changing it does not move existing entries: copy the old folder to the "
-        "new location first (see `journal docs concepts`). `journal path` prints the folder in use.",
+        "new location first (see `journal docs concepts`), or change it in `journal setup`, which "
+        "offers to move them. `journal path` prints the folder in use.",
         "journal config set storage.dir ~/Documents/journal",
         default_text="~/.local/share/journal",
     ),
@@ -72,9 +85,10 @@ SETTINGS: list[Setting] = [
         "transcribe.language",
         "text",
         "en",
-        "Language spoken in voice memos, as a two-letter code (en, de, es, …), or `auto` to let "
+        "Language spoken in voice memos, as a short code (en, de, es, …), or `auto` to let "
         "whisper detect it per memo.",
         "journal config set transcribe.language auto",
+        check=_language,
     ),
     Setting(
         "memo.subject_prefix",
@@ -169,6 +183,8 @@ def coerce(setting: Setting, values: list[str]):
         raise ValueError(f"{setting.key} must be one of: {', '.join(setting.choices)}")
     if not value.strip():
         raise ValueError(f"{setting.key} can't be empty")
+    if setting.check is not None:
+        return setting.check(value)
     return value
 
 

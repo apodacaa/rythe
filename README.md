@@ -70,6 +70,8 @@ mv ~/.local/share/journal ~/Documents/journal      # the whole folder
 journal config set storage.dir ~/Documents/journal
 ```
 
+`journal setup` does both steps for you: pick a new folder there and it offers to move the journal.
+
 The `JOURNAL_DIR` environment variable also works and takes precedence, but it only applies to
 programs started from a shell that exports it, so the setting is the safer choice. A good place
 for the folder is somewhere you already back up (a synced folder, for example).
