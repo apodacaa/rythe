@@ -81,7 +81,8 @@ the text.
 
 Changing `storage.dir` only changes where the journal looks; it does not move files. To relocate
 an existing journal, move the whole folder (it contains the entries, audio and the rest),
-then point the setting at it:
+then point the setting at it (or change the folder in `journal setup`, which offers to move it
+for you):
 
 ```
 journal path                                   # the current folder, e.g. ~/.local/share/journal
