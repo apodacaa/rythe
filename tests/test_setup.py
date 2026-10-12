@@ -460,4 +460,4 @@ def test_only_the_steps_that_ask_something_are_numbered(home):
     plain = s.text
     positions = [plain.index(f"{n}/3") for n in range(1, 4)] + [plain.index("WRITING PROMPTS")]
     assert positions == sorted(positions)
-    assert "4/" not in plain
+    assert "4/3" not in plain and "/4" not in plain.replace(str(home), "")
