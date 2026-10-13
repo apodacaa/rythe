@@ -107,18 +107,83 @@ def test_changing_one_answer_writes_only_that_key(home):
     assert "false" in line and ui.glyph("arrow") in line
 
 
-def test_bad_folder_is_asked_again_then_saved_with_move_hint(home):
-    old = home / ".local" / "share" / "journal" / "entries" / "2026" / "01"
-    old.mkdir(parents=True)
-    (old / "2026-01-01T080000.txt").write_text("---\ncreated: 2026-01-01T08:00:00+00:00\n---\nhi\n")
+ENTRY = Path("entries") / "2026" / "01" / "2026-01-01T080000.txt"
+
+
+def _journal_with_one_entry(home) -> Path:
+    old = home / ".local" / "share" / "journal"
+    (old / ENTRY).parent.mkdir(parents=True)
+    (old / ENTRY).write_text("---\ncreated: 2026-01-01T08:00:00+00:00\n---\nhi\n")
+    return old
+
+
+def test_bad_folder_is_asked_again_then_the_journal_moves_on_save(home):
+    old = _journal_with_one_entry(home)
     new = home / "Documents" / "journal"
 
-    s = Session("n", "relative/path", str(new), "", "", "y", "")
+    s = Session("n", "relative/path", str(new), "", "", "", "y", "")  # ..., move (default yes), ...
     assert s.run() == 0
     assert "must be an absolute path" in s.text
+    assert any("Move your journal (1 entry) there too? [Y/n]" in p for p in s.prompts)
     assert load_raw() == {"storage": {"dir": str(new)}}
-    assert "(1 entry)" in s.text
-    assert f"mv {home}/.local/share/journal {new}" in s.text  # existing entries are not moved for you
+    assert (new / ENTRY).exists() and not old.exists()
+    assert "Moved your journal" in s.text and "journal folder moves from" in s.text
+
+
+def test_nothing_moves_when_the_final_save_is_declined(home):
+    old = _journal_with_one_entry(home)
+    new = home / "Documents" / "journal"
+    s = Session("n", str(new), "", "", "", "n", "")
+    assert s.run() == 0
+    assert (old / ENTRY).exists() and not new.exists() and not config_path().exists()
+
+
+def test_declining_the_move_leaves_the_entries_and_says_how_to_copy_them(home):
+    old = _journal_with_one_entry(home)
+    new = home / "Documents" / "journal"
+    s = Session("n", str(new), "n", "", "", "y", "")
+    assert s.run() == 0
+    assert load_raw() == {"storage": {"dir": str(new)}}
+    assert (old / ENTRY).exists()
+    assert f"cp -a {old}/. {new}/" in s.text  # works whether or not the new folder exists yet
+
+
+def test_a_folder_that_already_has_files_is_used_as_is_and_nothing_moves(home):
+    old = _journal_with_one_entry(home)
+    new = home / "Documents" / "journal"
+    (new / "entries").mkdir(parents=True)
+    s = Session("n", str(new), "", "", "y", "")  # no move question this time
+    assert s.run() == 0
+    assert not any("Move your journal" in p for p in s.prompts)
+    assert "already has files in it" in s.text and f"cp -a {old}/. {new}/" in s.text
+    assert (old / ENTRY).exists() and load_raw() == {"storage": {"dir": str(new)}}
+
+
+def test_a_failed_move_puts_the_folder_setting_back(home, monkeypatch):
+    old = _journal_with_one_entry(home)
+    new = home / "Documents" / "journal"
+
+    def failing(src, dst):
+        raise OSError("disk full")
+
+    monkeypatch.setattr("journal.setup.shutil.move", failing)
+    s = Session("n", str(new), "", "n", "", "y", "")  # move yes, resurfacing off, save
+    assert s.run() == 0
+    assert "Couldn't move your journal (disk full)" in s.text
+    assert load_raw() == {"resurface": {"enabled": False}}  # the other answer is kept
+    assert (old / ENTRY).exists()
+
+
+def test_a_model_in_a_journal_that_is_moving_counts_as_downloaded(home):
+    old = _journal_with_one_entry(home)
+    (old / "models").mkdir()
+    (old / "models" / "ggml-small.bin").write_bytes(b"x")
+    new = home / "Documents" / "journal"
+    calls, download = _downloads()
+    s = Session("n", str(new), "", "", "", "", "", "y", "")  # move, resurface, voice (default yes), model, language, save
+    assert s.run(download=download) == 0
+    assert "already downloaded" in s.text and calls == []
+    assert (new / "models" / "ggml-small.bin").exists()
 
 
 def test_journal_dir_env_skips_the_folder_question(tmp_path, monkeypatch):
@@ -147,6 +212,38 @@ def test_rerun_shows_current_values_as_the_defaults(home):
     s.run()
     assert any("Show an older entry after I save one? [y/N]" in p for p in s.prompts)
     assert load_raw() == {"resurface": {"enabled": False}}  # unchanged by accepting defaults
+
+
+def test_stopping_after_the_save_does_not_claim_nothing_changed(home):
+    s = Session("", "n", "", "y")  # saved, then EOF at the first-entry question
+    assert s.run(start_entry=lambda: 0) == 130
+    assert load_raw() == {"resurface": {"enabled": False}}
+    assert "already saved" in s.text and "Nothing was changed" not in s.text
+
+
+def test_the_closing_question_only_says_first_entry_for_an_empty_journal(home):
+    s = Session("", "", "", "")
+    s.run(start_entry=lambda: 0)
+    assert any("Write your first entry now?" in p for p in s.prompts)
+
+    _journal_with_one_entry(home)
+    s = Session("", "", "", "")
+    s.run(start_entry=lambda: 0)
+    assert any("Write an entry now?" in p for p in s.prompts)
+    assert not any("first entry" in p for p in s.prompts)
+
+
+def test_an_entry_written_from_the_wizard_gets_no_setup_tip(capsys, monkeypatch):
+    import sys
+
+    monkeypatch.setattr("journal.cli._interactive", lambda: True)
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True, raising=False)
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True, raising=False)
+    monkeypatch.setattr("journal.setup.run_wizard", lambda start_entry: main(["add", "first, from setup"]))
+
+    assert main(["setup"]) == 0
+    assert "journal setup" not in capsys.readouterr().out
+    assert not config_path().exists()
 
 
 def test_first_entry_is_offered_and_started_on_yes(home):
@@ -218,10 +315,33 @@ def test_already_downloaded_model_is_not_offered_again(home):
 
 
 def test_bad_model_and_language_are_asked_again(home):
-    s = Session("", "", "y", "gigantic", "tiny", "english", "es", "n", "y", "")
+    s = Session("", "", "y", "gigantic", "tiny", "english", "ES", "n", "y", "")
     s.run(download=_downloads()[1])
     assert "must be one of" in s.text and "short language code" in s.text
     assert load_raw() == {"transcribe": {"model": "tiny", "language": "es"}}
+
+
+def test_config_set_checks_the_language_the_same_way_the_wizard_does(capsys):
+    code, _, err = run(capsys, "config", "set", "transcribe.language", "english")
+    assert code == 1 and "short language code" in err
+    assert run(capsys, "config", "set", "transcribe.language", "DE")[0] == 0
+    assert load_raw() == {"transcribe": {"language": "de"}}
+
+
+def test_voice_memo_defaults_follow_what_is_already_there(home):
+    s = Session("", "", "y", "", "", "", "")  # voice yes, model, language, download (default), first entry
+    calls, download = _downloads()
+    s.run(download=download)
+    assert any("Will you use voice memos? [y/N]" in p for p in s.prompts)
+    assert any("Download the small model now" in p and "[Y/n]" in p for p in s.prompts)
+    assert calls == [("small", False)]
+
+    model = home / ".local" / "share" / "journal" / "models" / "ggml-small.bin"
+    model.parent.mkdir(parents=True)
+    model.write_bytes(b"x")
+    s = Session("", "", "", "", "", "")
+    s.run(download=download)
+    assert any("Will you use voice memos? [Y/n]" in p for p in s.prompts)
 
 
 def test_missing_voice_tools_are_explained(home, monkeypatch):
@@ -317,8 +437,8 @@ def test_wizard_is_styled_when_color_is_on_and_plain_text_underneath(home):
     s.run()
     assert "\x1b[" in s.text  # styled
     plain = ui.strip_ansi(s.text)
-    assert "J O U R N A L   S E T U P" in plain and "1/4  WHERE SHOULD YOUR JOURNAL LIVE?" in plain
-    assert "4/4  WRITING PROMPTS" in plain and "You're set" in plain
+    assert "J O U R N A L   S E T U P" in plain and "1/3  WHERE SHOULD YOUR JOURNAL LIVE?" in plain
+    assert "WRITING PROMPTS" in plain and "You're set" in plain
     assert "Saved to" in plain
 
     lines = plain.splitlines()
@@ -334,9 +454,10 @@ def test_wizard_has_no_escape_codes_when_color_is_off(home):
     assert "\x1b" not in s.text and "\x01" not in s.text
 
 
-def test_all_four_steps_are_numbered_in_order(home):
+def test_only_the_steps_that_ask_something_are_numbered(home):
     s = Session("", "", "", "")
     s.run()
     plain = s.text
-    positions = [plain.index(f"{n}/4") for n in range(1, 5)]
+    positions = [plain.index(f"{n}/3") for n in range(1, 4)] + [plain.index("WRITING PROMPTS")]
     assert positions == sorted(positions)
+    assert "4/3" not in plain and "/4" not in plain.replace(str(home), "")

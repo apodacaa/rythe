@@ -121,7 +121,14 @@ def render_report(report: dict) -> str:
     return "\n".join(lines)
 
 
-TOTAL_STEPS = 4  # folder, resurfacing, voice memos, prompts
+TOTAL_STEPS = 3  # folder, resurfacing, voice memos (the prompts section after them asks nothing)
+
+
+def _is_free(folder: Path) -> bool:
+    """True if a journal can be moved to `folder`: it doesn't exist yet, or is an empty folder."""
+    if not folder.exists():
+        return True
+    return folder.is_dir() and not any(folder.iterdir())
 
 
 class _Wizard:
@@ -132,7 +139,9 @@ class _Wizard:
         self.say = say
         self.raw = load_raw()
         self.changes: dict[str, tuple[object, object]] = {}  # key -> (old, new)
-        self.moved_from: Path | None = None
+        self.moved_from: Path | None = None  # the old folder, if it has files and a new one was chosen
+        self.move = False  # move the old folder to the new place when saving
+        self.saved = False  # the config file was written in this run
         self.download: str | None = None  # a whisper model to fetch after saving
 
     # -- small helpers --------------------------------------------------------------------
@@ -216,10 +225,20 @@ class _Wizard:
                 self.say(ui.warn(str(exc)))
                 continue
             break
-        if Path(new).expanduser() != current:
-            self.propose("storage.dir", new)
-            if count:
-                self.moved_from = current
+        target = Path(new).expanduser()
+        if target == current:
+            return
+        self.propose("storage.dir", new)
+        if _is_free(current):
+            return  # nothing in the old folder to bring along
+        self.moved_from = current
+        if not _is_free(target):
+            self.say(" " + ui.warn(
+                f"{target} already has files in it, so journal will use what's there and your "
+                f"current journal stays in {current}."
+            ))
+        else:
+            self.move = self.yes_no(f"Move your journal{entries} there too?", True)
 
     def resurface(self) -> None:
         self.heading(2, "Bring up the past?")
@@ -244,7 +263,9 @@ class _Wizard:
                 "dim",
             )
         )
-        if not self.yes_no("Will you use voice memos?", False):
+        # Someone who already downloaded their model is using voice memos.
+        in_use = self._model_file(self.current("transcribe.model")).exists()
+        if not self.yes_no("Will you use voice memos?", in_use):
             return
         for name in ("ffmpeg", "whisper-cli"):
             if shutil.which(name) is None:
@@ -280,31 +301,36 @@ class _Wizard:
                 self.say(ui.warn(str(exc)))
         self.propose("transcribe.model", model)
 
+        language_setting = settings.lookup("transcribe.language")
         default = self.current("transcribe.language")
         while True:
             answer = (self.ask(self._q("Language spoken in your memos?", f"(a code like en, de, es, or auto) [{default}]"))
-                      .strip().lower() or default)
-            if answer == "auto" or (answer.isalpha() and 2 <= len(answer) <= 3):
+                      .strip() or default)
+            try:
+                language = settings.coerce(language_setting, [answer])
                 break
-            self.say(ui.warn("Use a short language code such as en, de or es, or `auto` to detect it each time."))
-        self.propose("transcribe.language", answer)
+            except ValueError as exc:
+                self.say(ui.warn(str(exc)))
+        self.propose("transcribe.language", language)
 
         if self._model_file(model).exists():
             self.say(" " + ui.ok(f"The {model} model is already downloaded."))
-        elif self.yes_no(f"Download the {model} model now ({transcribe.format_size(model)})?", False):
+        elif self.yes_no(f"Download the {model} model now ({transcribe.format_size(model)})?", True):
             self.download = model
         else:
             self.say(" " + ui.warn(f"Voice memos won't work until it's downloaded: `journal model download {model}`."))
 
     def _model_file(self, model: str) -> Path:
-        """Where `model` will live: under the folder chosen in this run, if it changed."""
-        folder = self.changes.get("storage.dir")
+        """Where `model` will live: under the folder chosen in this run, if it changed. A journal
+        that is being moved there brings its models along, so those are looked up where they are now.
+        """
+        folder = None if self.move else self.changes.get("storage.dir")
         base = Path(folder[1]).expanduser() if folder else store.data_dir()
         return base / "models" / transcribe.KNOWN_MODELS[model]
 
     def prompts_info(self) -> None:
         extra = load_config().prompts
-        self.heading(4, "Writing prompts")
+        self.say("\n" + ui.heading("Writing prompts"))
         rows = [ui.style("Always optional; a bare `journal` is a blank page.", "dim"), ""]
         for name in sorted(prompts.available(extra)):
             rows.append(f"{ui.style(f'{name:<9}', 'bold', 'cyan')} {prompts.SUMMARIES.get(name, 'your own set')}")
@@ -324,6 +350,8 @@ class _Wizard:
                 f"{ui.style(f'{key:<{width}}', 'bold')}  {ui.style(_fmt(old, setting), 'dim')} "
                 f"{ui.style(ui.glyph('arrow'), 'magenta')} {ui.style(_fmt(new, setting), 'bold', 'green')}"
             )
+        if self.move:
+            rows.append(ui.style(f"your journal folder moves from {self.moved_from}", "dim"))
         self.say("\n" + ui.box("Here's what will change", rows))
         if not self.yes_no("Save these?", True):
             self.say(" " + ui.warn("Nothing was saved."))
@@ -331,22 +359,50 @@ class _Wizard:
         for key, (_, new) in self.changes.items():
             settings.set_in(self.raw, key, new)
         backup = write_raw(self.raw)
+        self.saved = True
         self.say(" " + ui.ok(f"Saved to {config_path()}"))
         if backup:
             self.say(" " + ui.warn(f"Your file had comments, which rewriting drops; the old one is at {backup}."))
-        if self.moved_from is not None:
+        if self.move:
+            self._move_journal()
+        elif self.moved_from is not None:
             new_dir = store.data_dir()
             self.say(
                 "\n" + ui.gutter(
                     [
                         f"Your existing entries are still in {self.moved_from}. To bring them along,",
-                        "move the whole folder:",
+                        "copy what's inside that folder into the new one:",
                         "",
-                        f"    {ui.style(f'mv {self.moved_from} {new_dir}', 'bold')}",
+                        f"    {ui.style(f'cp -a {self.moved_from}/. {new_dir}/', 'bold')}",
                     ]
                 )
             )
         return True
+
+    def _move_journal(self) -> None:
+        """Move the old folder to the one just saved. If that fails, put the setting back, so the
+        journal is never left pointing at a folder its entries aren't in."""
+        old, new = self.moved_from, store.data_dir()
+        try:
+            if not _is_free(new):
+                raise OSError(f"{new} is no longer empty")
+            new.parent.mkdir(parents=True, exist_ok=True)
+            if new.exists():
+                new.rmdir()
+            shutil.move(str(old), str(new))
+        except OSError as exc:
+            previous = self.changes.pop("storage.dir")[0]
+            if previous is None:
+                settings.unset_in(self.raw, "storage.dir")
+            else:
+                settings.set_in(self.raw, "storage.dir", previous)
+            write_raw(self.raw)
+            self.move = False
+            self.say(" " + ui.warn(
+                f"Couldn't move your journal ({exc}), so it stays in {old} and storage.dir is unchanged."
+            ))
+            return
+        self.say(" " + ui.ok(f"Moved your journal to {new}"))
 
 
 def _download(model: str) -> None:
@@ -387,7 +443,8 @@ def run_wizard(
                     say(f"   Try again later with `journal model download {wiz.download}`.")
         say("")
         code = 0
-        if start_entry is not None and wiz.yes_no("Write your first entry now?", False):
+        which = "your first entry" if store.count_entries() == 0 else "an entry"
+        if start_entry is not None and wiz.yes_no(f"Write {which} now?", False):
             code = start_entry()
         commands = [
             ("journal add <words>", "capture a thought in one line"),
@@ -398,5 +455,8 @@ def run_wizard(
         say("\n" + ui.box("You're set. Good next commands", rows))
         return code
     except (EOFError, KeyboardInterrupt):
-        say("\n " + ui.warn("Nothing was changed."))
+        if wiz.saved:
+            say("\n " + ui.warn("Stopped. Your settings were already saved."))
+        else:
+            say("\n " + ui.warn("Nothing was changed."))
         return 130

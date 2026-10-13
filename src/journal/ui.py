@@ -137,6 +137,11 @@ def step(number: int, total: int, title: str) -> str:
     )
 
 
+def heading(title: str) -> str:
+    """Like `step`, for a section that isn't one of the numbered questions."""
+    return " " + style(glyph("bar"), "magenta") + " " + style(title.upper(), "bold")
+
+
 def gutter(lines: list[str]) -> str:
     bar = style(glyph("gutter"), "gray")
     return "\n".join(f" {bar}  {line}" if line else f" {bar}" for line in lines)
