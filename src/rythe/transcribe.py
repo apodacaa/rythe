@@ -132,7 +132,7 @@ def _run(cmd: list[str], *, what: str) -> None:
 def transcribe(audio_path: Path, *, model: str = "small", language: str = "en") -> str:
     path = model_path(model)
     if not path.exists():
-        raise TranscribeError(f"model {model!r} isn't downloaded yet; run `journal model download {model}`")
+        raise TranscribeError(f"model {model!r} isn't downloaded yet; run `rythe model download {model}`")
 
     ffmpeg = _require("ffmpeg", package_hint="install the ffmpeg package")
     whisper_cli = _require("whisper-cli", package_hint="install the whisper-cpp package")

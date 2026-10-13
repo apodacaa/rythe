@@ -47,8 +47,8 @@ def style_help(text: str) -> str:
     return "\n".join(out)
 
 
-class JournalParser(argparse.ArgumentParser):
-    """The journal's parser (and, via add_subparsers, every sub-command's), with styled help."""
+class RytheParser(argparse.ArgumentParser):
+    """rythe's parser (and, via add_subparsers, every sub-command's), with styled help."""
 
     def __init__(self, *args, **kwargs):
         if sys.version_info >= (3, 14):

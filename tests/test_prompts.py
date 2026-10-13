@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from journal import prompts
-from journal.cli import main
+from rythe import prompts
+from rythe.cli import main
 
 
 def test_strip_scissors_removes_the_marker_and_everything_after():
@@ -36,7 +36,7 @@ def test_prompt_is_shown_in_the_draft_but_not_saved(capsys, monkeypatch):
         path.write_text("my answer\n" + path.read_text())  # user writes above the scissors line
         return 0
 
-    monkeypatch.setattr("journal.cli.subprocess.call", fake_editor)
+    monkeypatch.setattr("rythe.cli.subprocess.call", fake_editor)
 
     assert main(["write", "--prompt", "hard"]) == 0
     assert prompts.SCISSORS in seen[0] and "15 minutes" in seen[0]
@@ -47,7 +47,7 @@ def test_prompt_is_shown_in_the_draft_but_not_saved(capsys, monkeypatch):
 
 
 def test_prompt_only_draft_aborts_as_empty(capsys, monkeypatch):
-    monkeypatch.setattr("journal.cli.subprocess.call", lambda command: 0)  # leaves the draft as-is
+    monkeypatch.setattr("rythe.cli.subprocess.call", lambda command: 0)  # leaves the draft as-is
 
     assert main(["new", "--editor", "--prompt"]) == 1
     assert "no entry created" in capsys.readouterr().err
@@ -60,9 +60,9 @@ def test_prompt_requires_editor_and_known_set(capsys):
 
 
 def test_config_prompts_load(tmp_path, monkeypatch):
-    from journal.config import load_config
+    from rythe.config import load_config
 
     cfg = tmp_path / "c.toml"
     cfg.write_text('[prompts]\nmine = ["one?", "two?"]\n')
-    monkeypatch.setenv("JOURNAL_CONFIG", str(cfg))
+    monkeypatch.setenv("RYTHE_CONFIG", str(cfg))
     assert load_config().prompts == {"mine": ["one?", "two?"]}

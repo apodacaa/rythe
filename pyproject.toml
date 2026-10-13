@@ -1,5 +1,5 @@
 [project]
-name = "journal"
+name = "rythe"
 dynamic = ["version"]
 description = "A date/time-based personal journal: $EDITOR to write, a CLI for everything else."
 requires-python = ">=3.11"
@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [project.scripts]
-journal = "journal.cli:main"
+rythe = "rythe.cli:main"
 
 [dependency-groups]
 dev = [
@@ -21,12 +21,12 @@ dev = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-# The version is written once, in the package, so `journal --version` and the built package agree.
+# The version is written once, in the package, so `rythe --version` and the built package agree.
 [tool.hatch.version]
-path = "src/journal/__init__.py"
+path = "src/rythe/__init__.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/journal"]
+packages = ["src/rythe"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

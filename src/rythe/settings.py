@@ -1,6 +1,6 @@
-"""The registry of every config setting and environment variable the journal understands.
+"""The registry of every config setting and environment variable rythe understands.
 
-This is the single source of truth for `journal config`, for `journal docs config`, and for the
+This is the single source of truth for `rythe config`, for `rythe docs config`, and for the
 tests that fail when a setting exists in `config.py` but isn't described here. To add a setting:
 add the field to `config.py`, add a `Setting` below, and the CLI and docs pick it up.
 """
@@ -44,12 +44,12 @@ SETTINGS: list[Setting] = [
         "path",
         None,
         "The folder where entries (and audio, whisper models, drafts and trash) "
-        "are stored. Absolute, or starting with ~. The $JOURNAL_DIR environment variable, if set, "
+        "are stored. Absolute, or starting with ~. The $RYTHE_DIR environment variable, if set, "
         "takes precedence. Changing it does not move existing entries: copy the old folder to the "
-        "new location first (see `journal docs concepts`), or change it in `journal setup`, which "
-        "offers to move them. `journal path` prints the folder in use.",
-        "journal config set storage.dir ~/Documents/journal",
-        default_text="~/.local/share/journal",
+        "new location first (see `rythe docs concepts`), or change it in `rythe setup`, which "
+        "offers to move them. `rythe path` prints the folder in use.",
+        "rythe config set storage.dir ~/Documents/journal",
+        default_text="~/.local/share/rythe",
     ),
     Setting(
         "appearance.color",
@@ -59,7 +59,7 @@ SETTINGS: list[Setting] = [
         "a terminal (never when piped, with --json, or when the NO_COLOR environment variable is "
         "set); `always` forces styling (like FORCE_COLOR); `never` turns it off. Colors are your "
         "terminal's own 16-color palette, so they follow your terminal theme.",
-        "journal config set appearance.color never",
+        "rythe config set appearance.color never",
         ("auto", "always", "never"),
     ),
     Setting(
@@ -69,16 +69,16 @@ SETTINGS: list[Setting] = [
         "After you save a new entry in a terminal, show one older entry: the same day in an "
         "earlier year, else a month ago, else a week ago. Never shown with --json or when "
         "output is piped.",
-        "journal config set resurface.enabled false",
+        "rythe config set resurface.enabled false",
     ),
     Setting(
         "transcribe.model",
         "choice",
         "small",
-        "The whisper.cpp model used by `journal ingest audio`. Bigger models are more accurate "
+        "The whisper.cpp model used by `rythe ingest audio`. Bigger models are more accurate "
         "and slower; `small` is a good CPU-only balance. Download one with "
-        "`journal model download <name>`.",
-        "journal config set transcribe.model medium",
+        "`rythe model download <name>`.",
+        "rythe config set transcribe.model medium",
         tuple(KNOWN_MODELS),
     ),
     Setting(
@@ -87,7 +87,7 @@ SETTINGS: list[Setting] = [
         "en",
         "Language spoken in voice memos, as a short code (en, de, es, …), or `auto` to let "
         "whisper detect it per memo.",
-        "journal config set transcribe.language auto",
+        "rythe config set transcribe.language auto",
         check=_language,
     ),
     Setting(
@@ -97,7 +97,7 @@ SETTINGS: list[Setting] = [
         "Subject-line prefix that marks an email as a voice memo. Read by external tools that "
         "sweep a mailbox (such as the journal-sweep agent skill); the CLI itself never reads "
         "mail.",
-        'journal config set memo.subject_prefix "voice:"',
+        'rythe config set memo.subject_prefix "voice:"',
     ),
 ]
 
@@ -106,20 +106,20 @@ PROMPTS_PATTERN = Setting(
     "prompts.<name>",
     "list",
     None,
-    "A set of writing prompts for `journal write --prompt <name>`. Each value is one prompt; "
+    "A set of writing prompts for `rythe write --prompt <name>`. Each value is one prompt; "
     "one is picked per day. A set named like a built-in (today, hard, distance, review) replaces "
-    "it. See `journal prompts list`.",
-    'journal config set prompts.gratitude "What am I grateful for today?" "Who helped me this week?"',
+    "it. See `rythe prompts list`.",
+    'rythe config set prompts.gratitude "What am I grateful for today?" "Who helped me this week?"',
 )
 
 ENV_VARS: list[tuple[str, str]] = [
     (
-        "JOURNAL_DIR",
-        "Where entries live. Overrides the `storage.dir` setting (default ~/.local/share/journal). "
+        "RYTHE_DIR",
+        "Where entries live. Overrides the `storage.dir` setting (default ~/.local/share/rythe). "
         "Only applies to programs started from a shell that exports it; to make the choice stick "
-        "everywhere, use `journal config set storage.dir` instead. Tests always set this.",
+        "everywhere, use `rythe config set storage.dir` instead. Tests always set this.",
     ),
-    ("JOURNAL_CONFIG", "Path of the config file (default ~/.config/journal/config.toml)."),
+    ("RYTHE_CONFIG", "Path of the config file (default ~/.config/rythe/config.toml)."),
     ("NO_COLOR", "If set to anything non-empty, turns styling off (see the `appearance.color` setting)."),
     ("FORCE_COLOR", "If set, forces styling on even when output isn't a terminal."),
     ("EDITOR", "Editor opened by write/new --editor/edit (falls back to nvim, vim, then vi)."),
@@ -205,7 +205,7 @@ def unset_in(raw: dict, key: str) -> bool:
 
 
 def unknown_keys(raw: dict) -> list[str]:
-    """Dotted keys present in the file that the journal doesn't know (typos, removed options)."""
+    """Dotted keys present in the file that rythe doesn't know (typos, removed options)."""
     unknown = []
     for section, table in raw.items():
         if not isinstance(table, dict):

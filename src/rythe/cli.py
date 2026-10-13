@@ -1,45 +1,45 @@
-"""journal — a date/time-based personal journal.
+"""rythe — a date/time-based personal journal.
 
 Examples:
-  journal new --text "Had a good day #gratitude"
-  journal add had coffee with Sam -t friends   # one-line capture; -t because shells eat '#'
-  journal write --prompt hard                 # opt-in prompt below the page: today (default), hard, distance
-  journal new --editor                        # compose in $EDITOR instead
-  echo "typed from a script" | journal new --source cli
-  journal list --since 2026-09-01 --tag work
-  journal list --since yesterday              # natural language works too; ISO is preferred
-  journal read                                # the last 7 days, as prose, oldest first
-  journal read --since 2026-09-01 --tag work  # any range or filter; pages through $PAGER
-  journal show last                           # also: today, or any unique prefix like 2026-09-30
-  journal edit                                # pick an entry with fzf (or edit the last one)
-  echo "new text" | journal edit last --stdin # replace an entry's text without an editor
-  journal show 2026-09-30T164608
-  journal search "coffee" --tag morning
-  journal search --tag work                  # tag filter alone, no text query
-  journal list --on 2026-09-30
-  journal list --untagged
-  journal review                              # read your week, then write a #review entry about it
-  journal status                              # last entry, entries this week; also --json
-  journal on-this-day                        # entries from today's date in any past year
-  journal on-this-day --date monday           # bare weekday names work; "last monday" doesn't
-  journal tags
-  journal tag 2026-09-30T164608 gratitude focus
-  journal edit 2026-09-30T164608
-  journal delete 2026-09-30T164608
-  journal model download small
-  journal ingest audio memo.m4a --message-id "<abc@mail>"
-  journal ingest text transcript.txt --at 2026-09-30T16:46:08+02:00
-  journal ingest seen "<abc@mail>"            # exit 0 if already ingested, else exit 1
-  journal path
+  rythe new --text "Had a good day #gratitude"
+  rythe add had coffee with Sam -t friends   # one-line capture; -t because shells eat '#'
+  rythe write --prompt hard                 # opt-in prompt below the page: today (default), hard, distance
+  rythe new --editor                        # compose in $EDITOR instead
+  echo "typed from a script" | rythe new --source cli
+  rythe list --since 2026-09-01 --tag work
+  rythe list --since yesterday              # natural language works too; ISO is preferred
+  rythe read                                # the last 7 days, as prose, oldest first
+  rythe read --since 2026-09-01 --tag work  # any range or filter; pages through $PAGER
+  rythe show last                           # also: today, or any unique prefix like 2026-09-30
+  rythe edit                                # pick an entry with fzf (or edit the last one)
+  echo "new text" | rythe edit last --stdin # replace an entry's text without an editor
+  rythe show 2026-09-30T164608
+  rythe search "coffee" --tag morning
+  rythe search --tag work                  # tag filter alone, no text query
+  rythe list --on 2026-09-30
+  rythe list --untagged
+  rythe review                              # read your week, then write a #review entry about it
+  rythe status                              # last entry, entries this week; also --json
+  rythe on-this-day                        # entries from today's date in any past year
+  rythe on-this-day --date monday           # bare weekday names work; "last monday" doesn't
+  rythe tags
+  rythe tag 2026-09-30T164608 gratitude focus
+  rythe edit 2026-09-30T164608
+  rythe delete 2026-09-30T164608
+  rythe model download small
+  rythe ingest audio memo.m4a --message-id "<abc@mail>"
+  rythe ingest text transcript.txt --at 2026-09-30T16:46:08+02:00
+  rythe ingest seen "<abc@mail>"            # exit 0 if already ingested, else exit 1
+  rythe path
 
-With no subcommand (or `journal write`), opens $EDITOR on a new entry — same as `journal new
+With no subcommand (or `rythe write`), opens $EDITOR on a new entry — same as `rythe new
 --editor`.
 
-Settings and docs (both explain themselves; `journal docs --all` prints everything):
-  journal config list                         # every setting: value, default, source
-  journal config set resurface.enabled false  # change one (validated); `config explain` says what each does
-  journal prompts list                        # the writing prompt sets and what each is for
-  journal docs                                # the built-in guide; `docs --list` for topics
+Settings and docs (both explain themselves; `rythe docs --all` prints everything):
+  rythe config list                         # every setting: value, default, source
+  rythe config set resurface.enabled false  # change one (validated); `config explain` says what each does
+  rythe prompts list                        # the writing prompt sets and what each is for
+  rythe docs                                # the built-in guide; `docs --list` for topics
 """
 from __future__ import annotations
 
@@ -115,7 +115,7 @@ def _compose_in_editor(prompt: str | None = None) -> tuple[str, Path] | None:
     if leftovers:
         path = leftovers[0]
         stamp = datetime.fromtimestamp(path.stat().st_mtime).strftime("%a %b %-d, %-I:%M %p")
-        print(f"journal: resuming an unsaved draft from {stamp}", file=sys.stderr)
+        print(f"rythe: resuming an unsaved draft from {stamp}", file=sys.stderr)
     else:
         path = store.new_draft_path()
         path.write_text(prompts.draft_text(prompt) if prompt else "")
@@ -143,7 +143,7 @@ def _print_resurfaced(entry: Entry) -> None:
     found = _resurfaced(entry)
     if found:
         label, old = found
-        print(f"{label}: {_preview(old, 70)}   (journal show {old.id})")
+        print(f"{label}: {_preview(old, 70)}   (rythe show {old.id})")
 
 
 _in_setup = False  # True while the wizard runs, so an entry written from it doesn't advertise it
@@ -151,13 +151,13 @@ _in_setup = False  # True while the wizard runs, so an entry written from it doe
 
 def _print_setup_tip() -> None:
     """After the very first entry, and only while there's no config file yet (saving a change in
-    `journal setup` or any `config set` creates it), point at the guided setup once. Stateless
+    `rythe setup` or any `config set` creates it), point at the guided setup once. Stateless
     on purpose.
     """
     if _in_setup:
         return
     if store.count_entries() == 1 and not config_path().exists():
-        print("tip: `journal setup` walks you through the options (folder, voice memos).")
+        print("tip: `rythe setup` walks you through the options (folder, voice memos).")
 
 
 def cmd_new(args: argparse.Namespace) -> int:
@@ -166,14 +166,14 @@ def cmd_new(args: argparse.Namespace) -> int:
     prompt = None
     if args.prompt:
         if not args.editor:
-            print("journal: --prompt only applies when composing in the editor", file=sys.stderr)
+            print("rythe: --prompt only applies when composing in the editor", file=sys.stderr)
             return 1
         prompt = prompts.pick(args.prompt, _now().date(), load_config().prompts)
     draft = None
     if args.editor:
         composed = _compose_in_editor(prompt)
         if composed is None:
-            print("journal: no entry created (empty)", file=sys.stderr)
+            print("rythe: no entry created (empty)", file=sys.stderr)
             return 1
         body, draft = composed
     elif args.text is None:
@@ -183,7 +183,7 @@ def cmd_new(args: argparse.Namespace) -> int:
     else:
         body = args.text
     if not body.strip():
-        print("journal: no entry created (empty)", file=sys.stderr)
+        print("rythe: no entry created (empty)", file=sys.stderr)
         return 1
     if getattr(args, "ensure_tags", None):
         body = _with_tags(body, args.ensure_tags)
@@ -224,7 +224,7 @@ def cmd_add(args: argparse.Namespace) -> int:
             print("(type your entry, then Ctrl-D to save, or Ctrl-C to abort)", file=sys.stderr)
         body = sys.stdin.read()
     if not body.strip():
-        print("journal: nothing to add (give some words, or pipe text in)", file=sys.stderr)
+        print("rythe: nothing to add (give some words, or pipe text in)", file=sys.stderr)
         return 1
     body = _with_tags(body, args.tag or [])
     return cmd_new(
@@ -263,7 +263,7 @@ def _pick_entry() -> str | None:
     if not lines:
         return None
     picked = subprocess.run(
-        ["fzf", "--preview", "journal show --no-pager {1}", "--preview-window", "right,60%,wrap"],
+        ["fzf", "--preview", "rythe show --no-pager {1}", "--preview-window", "right,60%,wrap"],
         input="\n".join(lines),
         stdout=subprocess.PIPE,
         text=True,
@@ -283,16 +283,16 @@ def _resolve_args(args: argparse.Namespace, *, may_pick: bool = False) -> int | 
             return 1  # fzf cancelled
         ref = picked or "last"
         if picked is None:
-            print("journal: no id given, using the last entry", file=sys.stderr)
+            print("rythe: no id given, using the last entry", file=sys.stderr)
     try:
         args.id = store.resolve(ref)
     except store.AmbiguousEntryError as exc:
-        print(f"journal: {ref!r} matches {len(exc.candidates)} entries:", file=sys.stderr)
+        print(f"rythe: {ref!r} matches {len(exc.candidates)} entries:", file=sys.stderr)
         for candidate in exc.candidates[:10]:
             print(f"  {candidate}", file=sys.stderr)
         return 1
     except store.EntryNotFoundError:
-        print(f"journal: no entry {ref!r}", file=sys.stderr)
+        print(f"rythe: no entry {ref!r}", file=sys.stderr)
         return 2
     return None
 
@@ -303,7 +303,7 @@ def cmd_show(args: argparse.Namespace) -> int:
     try:
         entry = store.get(args.id)
     except store.EntryNotFoundError:
-        print(f"journal: no entry {args.id!r}", file=sys.stderr)
+        print(f"rythe: no entry {args.id!r}", file=sys.stderr)
         return 2
     if args.json:
         print(json.dumps(_entry_to_dict(entry), indent=2))
@@ -389,12 +389,12 @@ def cmd_on_this_day(args: argparse.Namespace) -> int:
 
 def cmd_search(args: argparse.Namespace) -> int:
     if args.regex and not args.query:
-        print("journal: --regex needs a query to match against", file=sys.stderr)
+        print("rythe: --regex needs a query to match against", file=sys.stderr)
         return 1
     has_filter = args.tag or args.exclude_tag or args.untagged or args.since or args.until or args.on
     if not args.query and not has_filter:
         print(
-            "journal: search needs a query, or at least one of "
+            "rythe: search needs a query, or at least one of "
             "--tag/--exclude-tag/--untagged/--since/--until/--on",
             file=sys.stderr,
         )
@@ -519,12 +519,12 @@ def cmd_prompts_pick(args: argparse.Namespace) -> int:
     extra = load_config().prompts
     if args.name not in prompts.available(extra):
         sets = ", ".join(sorted(prompts.available(extra)))
-        print(f"journal: no prompt set {args.name!r} (available: {sets})", file=sys.stderr)
+        print(f"rythe: no prompt set {args.name!r} (available: {sets})", file=sys.stderr)
         return 2
     try:
         text = prompts.pick(args.name, day, extra)
     except ValueError as e:
-        print(f"journal: {e}", file=sys.stderr)
+        print(f"rythe: {e}", file=sys.stderr)
         return 1
     if args.json:
         print(json.dumps({"name": args.name, "date": day.isoformat(), "prompt": text}, indent=2, ensure_ascii=False))
@@ -542,12 +542,12 @@ def cmd_setup(args: argparse.Namespace) -> int:
             print(setup.render_report(report))
         return 0
     if args.json:
-        print("journal: --json goes with --check", file=sys.stderr)
+        print("rythe: --json goes with --check", file=sys.stderr)
         return 1
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
         print(
-            "journal: setup is interactive and needs a terminal. For scripts and agents: "
-            "`journal setup --check --json` reports the environment and `journal config set` "
+            "rythe: setup is interactive and needs a terminal. For scripts and agents: "
+            "`rythe setup --check --json` reports the environment and `rythe config set` "
             "changes settings.",
             file=sys.stderr,
         )
@@ -580,7 +580,7 @@ def cmd_tag(args: argparse.Namespace) -> int:
     try:
         entry = store.add_tags(args.id, args.tags)
     except store.EntryNotFoundError:
-        print(f"journal: no entry {args.id!r}", file=sys.stderr)
+        print(f"rythe: no entry {args.id!r}", file=sys.stderr)
         return 2
     if args.json:
         print(json.dumps(_entry_to_dict(entry), indent=2))
@@ -595,7 +595,7 @@ def cmd_delete(args: argparse.Namespace) -> int:
     try:
         trashed = store.delete(args.id)
     except store.EntryNotFoundError:
-        print(f"journal: no entry {args.id!r}", file=sys.stderr)
+        print(f"rythe: no entry {args.id!r}", file=sys.stderr)
         return 2
     if args.json:
         print(json.dumps({"id": args.id, "trashed_at": str(trashed)}, indent=2))
@@ -619,14 +619,14 @@ def cmd_edit(args: argparse.Namespace) -> int:
     non_interactive = args.stdin or args.text is not None
     if non_interactive and args.id is None:
         # No picker and no "last" default here: a script must say exactly which entry it changes.
-        print("journal: --stdin/--text need an explicit entry id (or `last`)", file=sys.stderr)
+        print("rythe: --stdin/--text need an explicit entry id (or `last`)", file=sys.stderr)
         return 1
     if (code := _resolve_args(args, may_pick=not non_interactive)) is not None:
         return code
     try:
         entry = store.get(args.id)
     except store.EntryNotFoundError:
-        print(f"journal: no entry {args.id!r}", file=sys.stderr)
+        print(f"rythe: no entry {args.id!r}", file=sys.stderr)
         return 2
 
     if non_interactive:
@@ -635,7 +635,7 @@ def cmd_edit(args: argparse.Namespace) -> int:
             after += "\n"  # stored bodies end with a newline; don't count its absence as a change
     else:
         # The editor only ever sees the body, never the frontmatter, so an edit can't corrupt it.
-        # Named journal-new-edit-… so it matches the same `journal-new-*.txt` contract as drafts.
+        # Named rythe-new-edit-… so it matches the same `rythe-new-*.txt` contract as drafts.
         fd, tmp_name = tempfile.mkstemp(suffix=".txt", prefix=f"{store.DRAFT_PREFIX}edit-{entry.id}-")
         os.close(fd)
         tmp_path = Path(tmp_name)
@@ -653,7 +653,7 @@ def cmd_edit(args: argparse.Namespace) -> int:
             print(render.done("edited", args.id, " (no changes)"))
         return 0
     if not after.strip():
-        print(f"journal: entry left empty, so it was not changed (use `journal delete {args.id}`)", file=sys.stderr)
+        print(f"rythe: entry left empty, so it was not changed (use `rythe delete {args.id}`)", file=sys.stderr)
         return 1
 
     entry = store.update_body(args.id, after, _now())
@@ -672,7 +672,7 @@ def cmd_path(args: argparse.Namespace) -> int:
 def cmd_ingest_audio(args: argparse.Namespace) -> int:
     path = Path(args.file)
     if not path.exists():
-        print(f"journal: no such file {args.file!r}", file=sys.stderr)
+        print(f"rythe: no such file {args.file!r}", file=sys.stderr)
         return 2
 
     created = _parse_when(args.at) if args.at else _now()
@@ -687,10 +687,10 @@ def cmd_ingest_audio(args: argparse.Namespace) -> int:
             force=args.force,
         )
     except store.DuplicateMessageError as exc:
-        print(f"journal: {exc}", file=sys.stderr)
+        print(f"rythe: {exc}", file=sys.stderr)
         return 3
     except transcribe.TranscribeError as exc:
-        print(f"journal: {exc}", file=sys.stderr)
+        print(f"rythe: {exc}", file=sys.stderr)
         return 1
 
     if args.json:
@@ -703,7 +703,7 @@ def cmd_ingest_audio(args: argparse.Namespace) -> int:
 def cmd_ingest_text(args: argparse.Namespace) -> int:
     path = Path(args.file)
     if not path.exists():
-        print(f"journal: no such file {args.file!r}", file=sys.stderr)
+        print(f"rythe: no such file {args.file!r}", file=sys.stderr)
         return 2
 
     created = _parse_when(args.at) if args.at else _now()
@@ -712,7 +712,7 @@ def cmd_ingest_text(args: argparse.Namespace) -> int:
             path, created=created, message_id=args.message_id, title=args.title or "", force=args.force
         )
     except store.DuplicateMessageError as exc:
-        print(f"journal: {exc}", file=sys.stderr)
+        print(f"rythe: {exc}", file=sys.stderr)
         return 3
 
     if args.json:
@@ -737,7 +737,7 @@ def cmd_model_download(args: argparse.Namespace) -> int:
             args.name, force=args.force, progress=transcribe.progress_printer(args.name)
         )
     except transcribe.TranscribeError as exc:
-        print(f"\njournal: {exc}", file=sys.stderr)
+        print(f"\nrythe: {exc}", file=sys.stderr)
         return 1
 
     print(file=sys.stderr)
@@ -759,7 +759,7 @@ def cmd_model_list(args: argparse.Namespace) -> int:
                 f"{badge} {ui.style(f'{name:8}', 'bold')} {transcribe.format_size(name):<8} "
                 f"{ui.style(m['note'], 'dim')}{ui.style(rec, 'green')}"
             )
-        print("[x] = already downloaded. Fetch one with `journal model download <name>`.")
+        print("[x] = already downloaded. Fetch one with `rythe model download <name>`.")
     return 0
 
 
@@ -769,9 +769,9 @@ def cmd_write(args: argparse.Namespace) -> int:
 
 
 # Help for flags that appear on many commands, applied to any flag defined without its own help
-# text, so `--help` and the generated `journal docs commands` never show a bare flag.
+# text, so `--help` and the generated `rythe docs commands` never show a bare flag.
 _DEFAULT_FLAG_HELP = {
-    "json": "print machine-readable JSON (stable shape; see `journal docs json`)",
+    "json": "print machine-readable JSON (stable shape; see `rythe docs json`)",
     "since": "only entries on or after this ISO date or timestamp (a bare date means the start of that day)",
     "until": "only entries on or before this ISO date or timestamp (a bare date includes that whole day)",
     "title": "optional title, shown in listings and when reading",
@@ -793,14 +793,14 @@ def _fill_flag_help(parser: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = helpstyle.JournalParser(
-        prog="journal",
+    parser = helpstyle.RytheParser(
+        prog="rythe",
         description="A date/time-based personal journal: $EDITOR to write, a CLI for everything else.",
         epilog=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--version", action="version", version=f"journal {__version__}", help="print the version and exit"
+        "--version", action="version", version=f"rythe {__version__}", help="print the version and exit"
     )
     sub = parser.add_subparsers(dest="command")
 
@@ -824,7 +824,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_add = sub.add_parser(
         "add",
-        help="one-line capture: journal add had coffee with Sam -t friends",
+        help="one-line capture: rythe add had coffee with Sam -t friends",
         description=(
             "Create an entry from the words on the command line. Tag with -t, or quote the text: "
             "in most shells an unquoted #tag starts a comment and is silently dropped."
@@ -941,7 +941,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_config = sub.add_parser(
         "config",
         help="see, explain and change settings (list, get, set, unset, explain, path)",
-        description="Inspect and change the config file safely. `journal docs config` documents every setting.",
+        description="Inspect and change the config file safely. `rythe docs config` documents every setting.",
     )
     config_sub = p_config.add_subparsers(dest="config_command", required=True)
 
@@ -960,7 +960,7 @@ def build_parser() -> argparse.ArgumentParser:
         description=(
             "Set a setting. Booleans take true/false; transcribe.model must be a known model; "
             "prompts.<name> takes one or more prompts, e.g. "
-            "`journal config set prompts.gratitude \"What am I grateful for?\" \"Who helped me?\"`. "
+            "`rythe config set prompts.gratitude \"What am I grateful for?\" \"Who helped me?\"`. "
             "The file is rewritten; hand-written comments are saved to config.toml.bak first."
         ),
     )
@@ -1046,7 +1046,7 @@ def build_parser() -> argparse.ArgumentParser:
         description=(
             "Open an entry's body in $EDITOR. The editor never sees the frontmatter, so an edit "
             "can't corrupt it, and `updated` is stamped only if the text actually changed. "
-            "Emptying the body is refused (use `journal delete`). The id can be a full id, "
+            "Emptying the body is refused (use `rythe delete`). The id can be a full id, "
             "`last`, `today`, or a unique prefix; leave it off to pick with fzf (or fall back "
             "to the last entry). For scripts, editors and agents, --stdin or --text replace the "
             "text without opening an editor; they need an explicit id."
@@ -1070,7 +1070,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_ingest_audio = ingest_sub.add_parser("audio", help="transcribe an audio file and create an entry")
     p_ingest_audio.add_argument("file")
     p_ingest_audio.add_argument("--at", metavar="ISO", help="timestamp; default now")
-    p_ingest_audio.add_argument("--message-id", help="for dedupe; see `journal ingest seen`")
+    p_ingest_audio.add_argument("--message-id", help="for dedupe; see `rythe ingest seen`")
     p_ingest_audio.add_argument("--title", default="")
     p_ingest_audio.add_argument("--model", choices=list(transcribe.KNOWN_MODELS), help="default: config, else small")
     p_ingest_audio.add_argument("--language", help="default: config, else en ('auto' to detect)")
@@ -1081,7 +1081,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_ingest_text = ingest_sub.add_parser("text", help="create an entry from a text/transcript file")
     p_ingest_text.add_argument("file")
     p_ingest_text.add_argument("--at", metavar="ISO", help="timestamp; default now")
-    p_ingest_text.add_argument("--message-id", help="for dedupe; see `journal ingest seen`")
+    p_ingest_text.add_argument("--message-id", help="for dedupe; see `rythe ingest seen`")
     p_ingest_text.add_argument("--title", default="")
     p_ingest_text.add_argument("--force", action="store_true", help="ingest even if --message-id was already seen")
     p_ingest_text.add_argument("--json", action="store_true")
@@ -1106,7 +1106,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_model_list.set_defaults(func=cmd_model_list)
 
     p_write = sub.add_parser(
-        "write", help="open $EDITOR on a new entry (default with no command); same as `journal new --editor`"
+        "write", help="open $EDITOR on a new entry (default with no command); same as `rythe new --editor`"
     )
     p_write.add_argument(
         "--prompt",
@@ -1136,7 +1136,7 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         # Covers unparseable dates from .dates (bad ISO and bad natural language both land
         # here), plus any other plain input-validation failure a command didn't already handle.
-        print(f"journal: {exc}", file=sys.stderr)
+        print(f"rythe: {exc}", file=sys.stderr)
         return 1
 
 

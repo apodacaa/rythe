@@ -2,8 +2,8 @@ import json
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from journal import prompts, store
-from journal.cli import main
+from rythe import prompts, store
+from rythe.cli import main
 
 
 def _fake_editor(monkeypatch, answer="what I make of it\n"):
@@ -15,7 +15,7 @@ def _fake_editor(monkeypatch, answer="what I make of it\n"):
         path.write_text(answer + path.read_text())
         return 0
 
-    monkeypatch.setattr("journal.cli.subprocess.call", call)
+    monkeypatch.setattr("rythe.cli.subprocess.call", call)
     return seen
 
 
@@ -60,7 +60,7 @@ def test_review_custom_range_title_and_excludes_past_reviews(capsys, monkeypatch
 
 
 def test_empty_review_is_not_saved(capsys, monkeypatch):
-    monkeypatch.setattr("journal.cli.subprocess.call", lambda command: 0)
+    monkeypatch.setattr("rythe.cli.subprocess.call", lambda command: 0)
 
     assert main(["review", "--no-read"]) == 1
     assert "no entry created" in capsys.readouterr().err

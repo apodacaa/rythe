@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from journal import transcribe
+from rythe import transcribe
 
 
 def test_model_path_unknown_name_raises():
@@ -36,7 +36,7 @@ def test_download_model_skips_if_already_present(journal_dir, monkeypatch):
     def fail_if_called(*a, **k):
         raise AssertionError("should not attempt a download when the model already exists")
 
-    monkeypatch.setattr("journal.transcribe.urllib.request.urlopen", fail_if_called)
+    monkeypatch.setattr("rythe.transcribe.urllib.request.urlopen", fail_if_called)
 
     path = transcribe.download_model("tiny")
     assert path == existing
@@ -58,7 +58,7 @@ def test_download_model_writes_file_and_reports_progress(journal_dir, monkeypatc
         def read(self, n):
             return chunks.pop(0) if chunks else b""
 
-    monkeypatch.setattr("journal.transcribe.urllib.request.urlopen", lambda url: FakeResponse())
+    monkeypatch.setattr("rythe.transcribe.urllib.request.urlopen", lambda url: FakeResponse())
 
     seen = []
     path = transcribe.download_model("tiny", progress=lambda done, total: seen.append((done, total)))
@@ -100,8 +100,8 @@ def test_transcribe_runs_ffmpeg_then_whisper_cli(journal_dir, monkeypatch, tmp_p
             out_stem.with_suffix(".txt").write_text("this is the transcript")
         return Result()
 
-    monkeypatch.setattr("journal.transcribe.shutil.which", lambda name: f"/usr/bin/{name}")
-    monkeypatch.setattr("journal.transcribe.subprocess.run", fake_run)
+    monkeypatch.setattr("rythe.transcribe.shutil.which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr("rythe.transcribe.subprocess.run", fake_run)
 
     text = transcribe.transcribe(audio_file, model="small", language="en")
 
@@ -115,7 +115,7 @@ def test_transcribe_raises_transcribe_error_when_ffmpeg_missing(journal_dir, mon
     transcribe.models_dir().mkdir(parents=True)
     (transcribe.models_dir() / "ggml-small.bin").write_bytes(b"fake model")
 
-    monkeypatch.setattr("journal.transcribe.shutil.which", lambda name: None)
+    monkeypatch.setattr("rythe.transcribe.shutil.which", lambda name: None)
 
     with pytest.raises(transcribe.TranscribeError, match="not found"):
         transcribe.transcribe(Path("/tmp/whatever.m4a"), model="small")
@@ -135,8 +135,8 @@ def test_transcribe_raises_on_nonzero_exit(journal_dir, monkeypatch, tmp_path):
 
         return Result()
 
-    monkeypatch.setattr("journal.transcribe.shutil.which", lambda name: f"/usr/bin/{name}")
-    monkeypatch.setattr("journal.transcribe.subprocess.run", fake_run)
+    monkeypatch.setattr("rythe.transcribe.shutil.which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr("rythe.transcribe.subprocess.run", fake_run)
 
     with pytest.raises(transcribe.TranscribeError, match="boom: unsupported codec"):
         transcribe.transcribe(audio_file, model="small")

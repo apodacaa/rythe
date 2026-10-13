@@ -1,10 +1,10 @@
 import json
 from datetime import datetime, timedelta, timezone
 
-from journal import store
-from journal.cli import main
-from journal.entry import Entry
-from journal.render import render_entries, render_entry
+from rythe import store
+from rythe.cli import main
+from rythe.entry import Entry
+from rythe.render import render_entries, render_entry
 
 TZ = timezone(timedelta(hours=2))
 
@@ -99,7 +99,7 @@ def test_resurface_falls_back_to_month_then_week_then_none():
 
 def test_new_prints_resurfaced_line_only_on_a_terminal_without_json(capsys, monkeypatch):
     _at(7, "a week back")
-    monkeypatch.setattr("journal.cli._interactive", lambda: True)
+    monkeypatch.setattr("rythe.cli._interactive", lambda: True)
 
     main(["new", "--text", "today"])
     out = capsys.readouterr().out
@@ -109,6 +109,6 @@ def test_new_prints_resurfaced_line_only_on_a_terminal_without_json(capsys, monk
     payload = json.loads(capsys.readouterr().out)  # only JSON: the human line isn't printed
     assert payload["resurfaced"]["label"] == "a week ago today"  # it's carried in the JSON instead
 
-    monkeypatch.setattr("journal.cli._interactive", lambda: False)
+    monkeypatch.setattr("rythe.cli._interactive", lambda: False)
     main(["new", "--text", "piped"])
     assert "ago today" not in capsys.readouterr().out

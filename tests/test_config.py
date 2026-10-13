@@ -1,4 +1,4 @@
-from journal.config import load_config
+from rythe.config import load_config
 
 
 def test_defaults_when_no_config_file():
@@ -19,7 +19,7 @@ language = "auto"
 subject_prefix = "voice-memo:"
 """
     )
-    monkeypatch.setenv("JOURNAL_CONFIG", str(config_file))
+    monkeypatch.setenv("RYTHE_CONFIG", str(config_file))
 
     config = load_config()
 

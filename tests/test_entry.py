@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from journal.entry import Entry, id_for
+from rythe.entry import Entry, id_for
 
 TZ = timezone(timedelta(hours=2))
 

@@ -3,9 +3,9 @@ from dataclasses import fields
 
 import pytest
 
-from journal import prompts, settings
-from journal.cli import main
-from journal.config import Config, config_path, load_config, load_raw
+from rythe import prompts, settings
+from rythe.cli import main
+from rythe.config import Config, config_path, load_config, load_raw
 
 
 def run(capsys, *argv):
@@ -149,21 +149,21 @@ def test_every_builtin_prompt_set_has_a_description():
 def test_data_dir_precedence_env_then_setting_then_default(tmp_path, monkeypatch, capsys):
     from pathlib import Path
 
-    from journal import store
+    from rythe import store
 
-    monkeypatch.delenv("JOURNAL_DIR")
-    assert store.data_dir() == Path("~/.local/share/journal").expanduser()
+    monkeypatch.delenv("RYTHE_DIR")
+    assert store.data_dir() == Path("~/.local/share/rythe").expanduser()
 
     chosen = tmp_path / "elsewhere"
     assert run(capsys, "config", "set", "storage.dir", str(chosen))[0] == 0
     assert store.data_dir() == chosen
 
-    monkeypatch.setenv("JOURNAL_DIR", str(tmp_path / "from-env"))
+    monkeypatch.setenv("RYTHE_DIR", str(tmp_path / "from-env"))
     assert store.data_dir() == tmp_path / "from-env"
 
 
 def test_storage_dir_expands_tilde_and_is_used_for_entries(tmp_path, monkeypatch, capsys):
-    monkeypatch.delenv("JOURNAL_DIR")
+    monkeypatch.delenv("RYTHE_DIR")
     monkeypatch.setenv("HOME", str(tmp_path))
     assert run(capsys, "config", "set", "storage.dir", "~/notes/journal")[0] == 0
 
@@ -180,9 +180,9 @@ def test_storage_dir_must_be_absolute_or_tilde(capsys):
 
 
 def test_changing_storage_dir_warns_that_entries_are_not_moved(tmp_path, monkeypatch, capsys):
-    monkeypatch.delenv("JOURNAL_DIR")
+    monkeypatch.delenv("RYTHE_DIR")
     monkeypatch.setenv("HOME", str(tmp_path))
-    old = tmp_path / ".local" / "share" / "journal"
+    old = tmp_path / ".local" / "share" / "rythe"
     (old / "entries").mkdir(parents=True)
     (old / "entries" / "x.txt").write_text("hi")
 
@@ -191,14 +191,14 @@ def test_changing_storage_dir_warns_that_entries_are_not_moved(tmp_path, monkeyp
 
 
 def test_journal_dir_env_overrides_and_set_says_so(tmp_path, capsys):
-    code, _, err = run(capsys, "config", "set", "storage.dir", str(tmp_path / "x"))  # conftest sets JOURNAL_DIR
-    assert code == 0 and "$JOURNAL_DIR is set and takes precedence" in err
+    code, _, err = run(capsys, "config", "set", "storage.dir", str(tmp_path / "x"))  # conftest sets RYTHE_DIR
+    assert code == 0 and "$RYTHE_DIR is set and takes precedence" in err
 
 
 def test_storage_dir_shows_its_default_in_list_and_explain(capsys):
-    assert "~/.local/share/journal" in run(capsys, "config", "list")[1]
+    assert "~/.local/share/rythe" in run(capsys, "config", "list")[1]
     out = run(capsys, "config", "explain", "storage.dir")[1]
-    assert "default: ~/.local/share/journal" in out and "JOURNAL_DIR" in out
+    assert "default: ~/.local/share/rythe" in out and "RYTHE_DIR" in out
 
 
 def test_a_leftover_history_section_from_an_older_version_is_ignored_and_can_be_removed(capsys):

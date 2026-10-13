@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from journal import ingest, store
+from rythe import ingest, store
 
 TZ = timezone(timedelta(hours=2))
 
@@ -38,7 +38,7 @@ def test_ingest_audio_transcribes_copies_audio_and_sets_fields(journal_dir, tmp_
     audio_file.write_bytes(b"fake audio bytes")
 
     monkeypatch.setattr(
-        "journal.ingest.transcribe_audio",
+        "rythe.ingest.transcribe_audio",
         lambda path, *, model, language: f"transcribed from {path.name} using {model}/{language}",
     )
 
@@ -60,7 +60,7 @@ def test_ingest_audio_skips_transcription_on_duplicate(journal_dir, tmp_path, mo
 
     calls = []
     monkeypatch.setattr(
-        "journal.ingest.transcribe_audio",
+        "rythe.ingest.transcribe_audio",
         lambda path, *, model, language: calls.append(1) or "transcribed",
     )
 
@@ -85,7 +85,7 @@ def test_ingest_audio_uses_config_defaults_when_not_specified(journal_dir, tmp_p
         seen["language"] = language
         return "text"
 
-    monkeypatch.setattr("journal.ingest.transcribe_audio", fake_transcribe)
+    monkeypatch.setattr("rythe.ingest.transcribe_audio", fake_transcribe)
 
     ingest.ingest_audio(audio_file, created=dt(9))
 

@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from journal import store, transcribe
-from journal.cli import main
+from rythe import store, transcribe
+from rythe.cli import main
 
 
 def test_ingest_text_creates_entry(capsys, tmp_path):
@@ -58,7 +58,7 @@ def test_ingest_audio_transcribes_and_creates_entry(capsys, tmp_path, monkeypatc
     audio_file.write_bytes(b"fake audio")
 
     monkeypatch.setattr(
-        "journal.ingest.transcribe_audio", lambda path, *, model, language: "a transcribed memo"
+        "rythe.ingest.transcribe_audio", lambda path, *, model, language: "a transcribed memo"
     )
 
     assert main(["ingest", "audio", str(audio_file), "--json"]) == 0
@@ -103,7 +103,7 @@ def test_model_download_writes_file(capsys, journal_dir, monkeypatch):
         def read(self, n):
             return b""
 
-    monkeypatch.setattr("journal.transcribe.urllib.request.urlopen", lambda url: FakeResponse())
+    monkeypatch.setattr("rythe.transcribe.urllib.request.urlopen", lambda url: FakeResponse())
 
     assert main(["model", "download", "tiny"]) == 0
     out = capsys.readouterr().out
@@ -123,7 +123,7 @@ def test_new_editor_composes_entry_from_editor_content(capsys, monkeypatch, jour
             f.write("written in the editor #composed\n")
         return 0
 
-    monkeypatch.setattr("journal.cli.subprocess.call", lambda command: fake_editor(command[-1]))
+    monkeypatch.setattr("rythe.cli.subprocess.call", lambda command: fake_editor(command[-1]))
 
     assert main(["new", "--editor", "--json"]) == 0
     entry = json.loads(capsys.readouterr().out)
@@ -139,7 +139,7 @@ def test_new_editor_passes_a_markdown_tmpfile_to_editor_command(capsys, monkeypa
         Path(command[-1]).write_text("content\n")
         return 0
 
-    monkeypatch.setattr("journal.cli.subprocess.call", fake_call)
+    monkeypatch.setattr("rythe.cli.subprocess.call", fake_call)
     monkeypatch.setenv("EDITOR", "nvim --clean")
 
     assert main(["new", "--editor"]) == 0
@@ -148,7 +148,7 @@ def test_new_editor_passes_a_markdown_tmpfile_to_editor_command(capsys, monkeypa
 
 
 def test_new_editor_empty_file_aborts_without_creating_entry(capsys, monkeypatch, journal_dir):
-    monkeypatch.setattr("journal.cli.subprocess.call", lambda command: 0)  # editor writes nothing
+    monkeypatch.setattr("rythe.cli.subprocess.call", lambda command: 0)  # editor writes nothing
 
     assert main(["new", "--editor"]) == 1
     assert "no entry created" in capsys.readouterr().err
@@ -164,7 +164,7 @@ def test_new_editor_temp_file_is_cleaned_up(monkeypatch, journal_dir):
         seen_path["path"].write_text("hello\n")
         return 0
 
-    monkeypatch.setattr("journal.cli.subprocess.call", fake_call)
+    monkeypatch.setattr("rythe.cli.subprocess.call", fake_call)
 
     main(["new", "--editor"])
     assert not seen_path["path"].exists()
@@ -172,7 +172,7 @@ def test_new_editor_temp_file_is_cleaned_up(monkeypatch, journal_dir):
 
 def test_no_subcommand_opens_editor_same_as_new_editor(capsys, monkeypatch, journal_dir):
     monkeypatch.setattr(
-        "journal.cli.subprocess.call",
+        "rythe.cli.subprocess.call",
         lambda command: Path(command[-1]).write_text("from bare journal\n"),
     )
 
@@ -186,8 +186,8 @@ def test_no_subcommand_opens_editor_same_as_new_editor(capsys, monkeypatch, jour
 
 def test_write_subcommand_is_the_same_as_new_editor(capsys, monkeypatch, journal_dir):
     monkeypatch.setattr(
-        "journal.cli.subprocess.call",
-        lambda command: Path(command[-1]).write_text("from journal write\n"),
+        "rythe.cli.subprocess.call",
+        lambda command: Path(command[-1]).write_text("from rythe write\n"),
     )
 
     assert main(["write"]) == 0
@@ -195,7 +195,7 @@ def test_write_subcommand_is_the_same_as_new_editor(capsys, monkeypatch, journal
 
     assert main(["show", entry_id, "--json"]) == 0
     shown = json.loads(capsys.readouterr().out)
-    assert shown["body"].strip() == "from journal write"
+    assert shown["body"].strip() == "from rythe write"
 
 
 def test_list_since_accepts_natural_language(capsys):
@@ -425,7 +425,7 @@ def test_top_level_help_exits_zero(capsys):
     with pytest.raises(SystemExit) as exc:
         main(["--help"])
     assert exc.value.code == 0
-    assert "journal" in capsys.readouterr().out
+    assert "rythe" in capsys.readouterr().out
 
 
 def test_subcommand_help_exits_zero(capsys):
@@ -466,7 +466,7 @@ def test_edit_invokes_editor_on_the_body_only_and_sets_updated(monkeypatch, caps
             f.write("added by the editor #edited\n")
         return 0
 
-    monkeypatch.setattr("journal.cli.subprocess.call", fake_call)
+    monkeypatch.setattr("rythe.cli.subprocess.call", fake_call)
     monkeypatch.setenv("EDITOR", "nvim --clean")
 
     assert main(["edit", entry_id]) == 0
@@ -488,7 +488,7 @@ def test_edit_with_no_changes_leaves_updated_none(monkeypatch, capsys, journal_d
     main(["new", "--text", "untouched", "--json"])
     entry_id = json.loads(capsys.readouterr().out)["id"]
 
-    monkeypatch.setattr("journal.cli.subprocess.call", lambda command: 0)
+    monkeypatch.setattr("rythe.cli.subprocess.call", lambda command: 0)
 
     assert main(["edit", entry_id]) == 0
     out = capsys.readouterr().out
@@ -503,17 +503,17 @@ def test_edit_emptied_body_is_refused_and_entry_untouched(monkeypatch, capsys, j
     main(["new", "--text", "keep me", "--json"])
     entry_id = json.loads(capsys.readouterr().out)["id"]
 
-    monkeypatch.setattr("journal.cli.subprocess.call", lambda command: Path(command[-1]).write_text(""))
+    monkeypatch.setattr("rythe.cli.subprocess.call", lambda command: Path(command[-1]).write_text(""))
 
     assert main(["edit", entry_id]) == 1
-    assert "journal delete" in capsys.readouterr().err
+    assert "rythe delete" in capsys.readouterr().err
     main(["show", entry_id, "--json"])
     assert json.loads(capsys.readouterr().out)["body"].strip() == "keep me"
 
 
 def test_new_bad_at_fails_before_opening_the_editor(capsys, monkeypatch, journal_dir):
     calls = []
-    monkeypatch.setattr("journal.cli.subprocess.call", lambda command: calls.append(command))
+    monkeypatch.setattr("rythe.cli.subprocess.call", lambda command: calls.append(command))
 
     assert main(["new", "--editor", "--at", "next blursday"]) == 1
     assert calls == []
@@ -521,7 +521,7 @@ def test_new_bad_at_fails_before_opening_the_editor(capsys, monkeypatch, journal
 
 def test_failed_save_keeps_the_draft_and_the_next_write_resumes_it(capsys, monkeypatch, journal_dir):
     monkeypatch.setattr(
-        "journal.cli.subprocess.call",
+        "rythe.cli.subprocess.call",
         lambda command: Path(command[-1]).write_text("precious words\n"),
     )
 
@@ -529,19 +529,19 @@ def test_failed_save_keeps_the_draft_and_the_next_write_resumes_it(capsys, monke
         raise OSError("disk full")
 
     real_create = store.create
-    monkeypatch.setattr("journal.cli.store.create", boom)
+    monkeypatch.setattr("rythe.cli.store.create", boom)
     with pytest.raises(OSError):
         main(["new", "--editor"])
     assert len(store.list_drafts()) == 1
 
-    monkeypatch.setattr("journal.cli.store.create", real_create)
+    monkeypatch.setattr("rythe.cli.store.create", real_create)
     seen = []
 
     def resume(command):
         seen.append(Path(command[-1]).read_text())
         return 0
 
-    monkeypatch.setattr("journal.cli.subprocess.call", resume)
+    monkeypatch.setattr("rythe.cli.subprocess.call", resume)
     assert main(["new", "--editor", "--json"]) == 0
     captured = capsys.readouterr()
     assert seen == ["precious words\n"]
@@ -589,9 +589,9 @@ def test_edit_without_id_edits_the_last_entry(monkeypatch, capsys):
     _make("2026-09-30T08:00:00+02:00", "old")
     _make("2026-10-01T09:00:00+02:00", "new")
     capsys.readouterr()
-    monkeypatch.setattr("journal.cli.shutil.which", lambda name: None)  # no fzf
+    monkeypatch.setattr("rythe.cli.shutil.which", lambda name: None)  # no fzf
     monkeypatch.setattr(
-        "journal.cli.subprocess.call", lambda command: Path(command[-1]).write_text("new, revised\n")
+        "rythe.cli.subprocess.call", lambda command: Path(command[-1]).write_text("new, revised\n")
     )
 
     assert main(["edit"]) == 0
@@ -648,7 +648,7 @@ def test_status_empty_journal(capsys):
 def test_status_reports_last_entry_week_count_and_on_this_day(capsys):
     from datetime import datetime, timedelta, timezone
 
-    from journal.cli import _status
+    from rythe.cli import _status
 
     now = datetime(2026, 10, 4, 12, tzinfo=timezone.utc)
     for at in ("2026-10-01T08:00:00+00:00", "2026-09-10T08:00:00+00:00", "2025-10-04T08:00:00+00:00"):
@@ -678,7 +678,7 @@ def test_help_documents_new_behaviour(capsys):
             main([*argv, "--help"])
         return " ".join(capsys.readouterr().out.split())
 
-    assert "journal config list" in help_of() and "journal docs" in help_of()
+    assert "rythe config list" in help_of() and "rythe docs" in help_of()
     assert "frontmatter" in help_of("edit") and "fzf" in help_of("edit")
     assert "--raw" in help_of("show") or "raw" in help_of("show")
     assert "on_this_day_count" in help_of("status")
@@ -695,17 +695,17 @@ class _FakeRun:
 
 @pytest.fixture
 def on_a_terminal(monkeypatch):
-    monkeypatch.setattr("journal.cli._interactive", lambda: True)
+    monkeypatch.setattr("rythe.cli._interactive", lambda: True)
     monkeypatch.delenv("PAGER", raising=False)
     monkeypatch.delenv("LESS", raising=False)
     fake = _FakeRun()
-    monkeypatch.setattr("journal.cli.subprocess.run", fake)
-    monkeypatch.setattr("journal.cli.shutil.which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr("rythe.cli.subprocess.run", fake)
+    monkeypatch.setattr("rythe.cli.shutil.which", lambda name: f"/usr/bin/{name}")
     return fake
 
 
 def test_pager_defaults_to_less_that_quits_on_one_screen_and_keeps_the_text(on_a_terminal):
-    from journal.cli import _output
+    from rythe.cli import _output
 
     _output("hello\n")
     (command, kwargs), = on_a_terminal.calls
@@ -715,7 +715,7 @@ def test_pager_defaults_to_less_that_quits_on_one_screen_and_keeps_the_text(on_a
 
 
 def test_a_users_own_less_setting_is_respected(on_a_terminal, monkeypatch):
-    from journal.cli import _output
+    from rythe.cli import _output
 
     monkeypatch.setenv("LESS", "-i")
     _output("hello")
@@ -723,7 +723,7 @@ def test_a_users_own_less_setting_is_respected(on_a_terminal, monkeypatch):
 
 
 def test_pager_env_var_is_used_and_still_gets_the_less_default(on_a_terminal, monkeypatch):
-    from journal.cli import _output
+    from rythe.cli import _output
 
     monkeypatch.setenv("PAGER", "less -S")
     _output("hello")
@@ -732,35 +732,35 @@ def test_pager_env_var_is_used_and_still_gets_the_less_default(on_a_terminal, mo
 
 
 def test_no_pager_flag_and_non_terminals_print_directly(on_a_terminal, monkeypatch, capsys):
-    from journal.cli import _output
+    from rythe.cli import _output
 
     _output("direct", no_pager=True)
-    monkeypatch.setattr("journal.cli._interactive", lambda: False)
+    monkeypatch.setattr("rythe.cli._interactive", lambda: False)
     _output("piped")
     assert on_a_terminal.calls == []
     assert capsys.readouterr().out == "direct\npiped\n"
 
 
 def test_without_a_pager_or_when_it_cannot_start_the_text_is_printed(on_a_terminal, monkeypatch, capsys):
-    from journal.cli import _output
+    from rythe.cli import _output
 
-    monkeypatch.setattr("journal.cli.shutil.which", lambda name: None)
+    monkeypatch.setattr("rythe.cli.shutil.which", lambda name: None)
     _output("no pager installed")
     assert capsys.readouterr().out == "no pager installed\n"
 
-    monkeypatch.setattr("journal.cli.shutil.which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr("rythe.cli.shutil.which", lambda name: f"/usr/bin/{name}")
 
     def cannot_start(command, **kwargs):
         raise FileNotFoundError(command[0])
 
-    monkeypatch.setattr("journal.cli.subprocess.run", cannot_start)
+    monkeypatch.setattr("rythe.cli.subprocess.run", cannot_start)
     _output("fallback")
     assert capsys.readouterr().out == "fallback\n"
 
 
 # The editor-file naming contract: editor configs recognise journal writing by this pattern
-# (an autocmd matching `*/journal-new-*.txt`). Renaming these files breaks them silently.
-EDITOR_FILE_PATTERN = "*/journal-new-*.txt"
+# (an autocmd matching `*/rythe-new-*.txt`). Renaming these files breaks them silently.
+EDITOR_FILE_PATTERN = "*/rythe-new-*.txt"
 
 
 def test_new_entry_draft_given_to_the_editor_matches_the_contract(capsys, monkeypatch):
@@ -773,7 +773,7 @@ def test_new_entry_draft_given_to_the_editor_matches_the_contract(capsys, monkey
         Path(command[-1]).write_text("hello\n")
         return 0
 
-    monkeypatch.setattr("journal.cli.subprocess.call", editor)
+    monkeypatch.setattr("rythe.cli.subprocess.call", editor)
     assert main(["write"]) == 0
     assert fnmatch(seen[0], EDITOR_FILE_PATTERN), seen[0]
     assert Path(seen[0]).parent.name == "drafts"
@@ -785,11 +785,11 @@ def test_edit_copy_given_to_the_editor_matches_the_contract(capsys, monkeypatch)
     main(["new", "--text", "before", "--json"])
     entry_id = json.loads(capsys.readouterr().out)["id"]
     seen = []
-    monkeypatch.setattr("journal.cli.subprocess.call", lambda command: seen.append(command[-1]) or 0)
+    monkeypatch.setattr("rythe.cli.subprocess.call", lambda command: seen.append(command[-1]) or 0)
 
     main(["edit", entry_id])
     assert fnmatch(seen[0], EDITOR_FILE_PATTERN), seen[0]
-    assert f"journal-new-edit-{entry_id}-" in Path(seen[0]).name
+    assert f"rythe-new-edit-{entry_id}-" in Path(seen[0]).name
 
 
 def test_a_draft_saved_under_the_old_name_still_resumes(capsys, monkeypatch, journal_dir):
@@ -802,7 +802,7 @@ def test_a_draft_saved_under_the_old_name_still_resumes(capsys, monkeypatch, jou
         seen.append(Path(command[-1]).read_text())
         return 0
 
-    monkeypatch.setattr("journal.cli.subprocess.call", editor)
+    monkeypatch.setattr("rythe.cli.subprocess.call", editor)
     assert main(["write", ]) == 0
     assert seen == ["left over from an older version\n"] and not old.exists()
 
@@ -815,7 +815,7 @@ def test_edit_stdin_replaces_the_text_without_an_editor(capsys, monkeypatch):
     import io
 
     entry_id = _new(capsys)
-    monkeypatch.setattr("journal.cli.subprocess.call", lambda command: pytest.fail("editor opened"))
+    monkeypatch.setattr("rythe.cli.subprocess.call", lambda command: pytest.fail("editor opened"))
     monkeypatch.setattr("sys.stdin", io.StringIO("rewritten from a pipe #piped"))
 
     assert main(["edit", entry_id, "--stdin", "--json"]) == 0
@@ -847,7 +847,7 @@ def test_edit_stdin_refuses_empty_text_and_needs_an_explicit_id(capsys, monkeypa
     entry_id = _new(capsys)
     monkeypatch.setattr("sys.stdin", io.StringIO("   \n"))
     assert main(["edit", entry_id, "--stdin"]) == 1
-    assert "journal delete" in capsys.readouterr().err
+    assert "rythe delete" in capsys.readouterr().err
 
     assert main(["edit", "--text", "no id given"]) == 1
     assert "explicit entry id" in capsys.readouterr().err
@@ -871,7 +871,7 @@ def test_edit_stdin_and_text_cannot_be_combined(capsys):
 def test_prompts_pick_is_the_prompt_new_would_show_that_day(capsys):
     from datetime import date
 
-    from journal import prompts
+    from rythe import prompts
 
     assert main(["prompts", "pick", "--date", "2026-10-08", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
@@ -904,7 +904,7 @@ def test_review_json_is_the_period_as_data_and_saves_nothing(capsys):
     assert payload["since"].startswith("2026-10-01T00:00:00")
     assert payload["until"].startswith("2026-10-07")
     assert [e["body"].strip() for e in payload["entries"]] == ["first day", "later day"]  # oldest first
-    from journal import prompts
+    from rythe import prompts
 
     assert payload["prompt"] in prompts.available()["review"]
 

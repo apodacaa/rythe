@@ -1,6 +1,6 @@
-"""`journal docs`: the built-in guide, readable by people and agents with no repo access.
+"""`rythe docs`: the built-in guide, readable by people and agents with no repo access.
 
-Four topics are static markdown shipped in the package (`journal/docs/*.md`). The other three are
+Four topics are static markdown shipped in the package (`rythe/docs/*.md`). The other three are
 generated from the real source of truth — the argparse parser (commands), the settings registry
 (config) and the prompt sets (prompts) — so they can't go out of date.
 """
@@ -17,7 +17,7 @@ from .config import config_path
 
 
 def _static(name: str):
-    return lambda: resources.files("journal").joinpath("docs", f"{name}.md").read_text()
+    return lambda: resources.files("rythe").joinpath("docs", f"{name}.md").read_text()
 
 
 def _subparsers_action(parser: argparse.ArgumentParser):
@@ -68,27 +68,27 @@ def render_commands() -> str:
 
     parser = build_parser()
     blocks = [
-        "# journal: commands\n\nGenerated from the CLI itself, so it is always current. Every "
-        "command also has `--help`. `journal` with no command is the same as `journal write`."
+        "# rythe: commands\n\nGenerated from the CLI itself, so it is always current. Every "
+        "command also has `--help`. `rythe` with no command is the same as `rythe write`."
     ]
-    _render_parser(parser, "journal", 2, blocks)
+    _render_parser(parser, "rythe", 2, blocks)
     return "\n\n".join(blocks) + "\n"
 
 
 def render_config() -> str:
     path = config_path()
     out = [
-        "# journal: configuration",
-        f"Settings live in a TOML file at `{path}` (override the location with `JOURNAL_CONFIG`). "
+        "# rythe: configuration",
+        f"Settings live in a TOML file at `{path}` (override the location with `RYTHE_CONFIG`). "
         "Every setting is optional; a missing file just means all defaults.",
         "## Inspect and change settings\n\n"
         "```\n"
-        "journal config list [--json]        every setting: value, default, where it came from\n"
-        "journal config get <key>            one value\n"
-        "journal config set <key> <value>…   change a setting (validated)\n"
-        "journal config unset <key>          back to the default\n"
-        "journal config explain [key]        what a setting does, with an example\n"
-        "journal config path                 where the file is\n"
+        "rythe config list [--json]        every setting: value, default, where it came from\n"
+        "rythe config get <key>            one value\n"
+        "rythe config set <key> <value>…   change a setting (validated)\n"
+        "rythe config unset <key>          back to the default\n"
+        "rythe config explain [key]        what a setting does, with an example\n"
+        "rythe config path                 where the file is\n"
         "```\n\n"
         "`set` and `unset` rewrite the file. If it had hand-written comments they are dropped, so "
         "the old file is first saved as `config.toml.bak` and you are told.",
@@ -121,11 +121,11 @@ def _default(s: settings.Setting) -> str:
 
 def render_prompts() -> str:
     out = [
-        "# journal: writing prompts",
+        "# rythe: writing prompts",
         "A prompt is a question shown below the page when you ask for it: "
-        "`journal write --prompt [set]` (or `journal new --editor --prompt [set]`). It sits under a "
+        "`rythe write --prompt [set]` (or `rythe new --editor --prompt [set]`). It sits under a "
         "divider line, and everything from that line down is removed when you save, so only your "
-        "writing is kept. Prompts are always opt-in; a bare `journal` is a blank page. One prompt "
+        "writing is kept. Prompts are always opt-in; a bare `rythe` is a blank page. One prompt "
         "is chosen per set per day, so reopening the editor the same day shows the same one.",
         "## Built-in sets",
     ]
@@ -135,17 +135,17 @@ def render_prompts() -> str:
     out.append(
         "## Your own sets\n\n"
         "```\n"
-        'journal config set prompts.gratitude "What am I grateful for today?" "Who helped me this week?"\n'
-        "journal write --prompt gratitude\n"
+        'rythe config set prompts.gratitude "What am I grateful for today?" "Who helped me this week?"\n'
+        "rythe write --prompt gratitude\n"
         "```\n\n"
-        "Each value is one prompt. A set named like a built-in replaces it. `journal prompts list` "
-        "shows every set and where it comes from; `journal prompts show <set>` prints its prompts."
+        "Each value is one prompt. A set named like a built-in replaces it. `rythe prompts list` "
+        "shows every set and where it comes from; `rythe prompts show <set>` prints its prompts."
     )
     return "\n\n".join(out) + "\n"
 
 
 TOPICS: dict[str, tuple[str, object]] = {
-    "overview": ("what journal is and the ideas behind it", _static("overview")),
+    "overview": ("what rythe is and the ideas behind it", _static("overview")),
     "concepts": ("entries, ids, tags, dates, safety nets, rereading, the data layout", _static("concepts")),
     "commands": ("every command and flag (generated from the CLI)", render_commands),
     "config": ("every setting and environment variable, and how to change them", render_config),
@@ -235,7 +235,7 @@ def cmd_docs(args: argparse.Namespace) -> int:
         names = list(TOPICS)
     elif args.topic:
         if args.topic not in TOPICS:
-            print(f"journal: no docs topic {args.topic!r} (topics: {', '.join(TOPICS)})", file=sys.stderr)
+            print(f"rythe: no docs topic {args.topic!r} (topics: {', '.join(TOPICS)})", file=sys.stderr)
             return 2
         names = [args.topic]
     else:
@@ -246,7 +246,7 @@ def cmd_docs(args: argparse.Namespace) -> int:
         return 0
     footer = ""
     if not args.topic and not args.all:
-        footer = "\nTopics: " + ", ".join(TOPICS) + "  (journal docs <topic>, or --list, or --all)\n"
+        footer = "\nTopics: " + ", ".join(TOPICS) + "  (rythe docs <topic>, or --list, or --all)\n"
     if _on_terminal():
         from .cli import _output  # lazy: cli imports this module
 

@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from journal import __version__
-from journal.cli import main
+from rythe import __version__
+from rythe.cli import main
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -14,7 +14,7 @@ def test_version_flag_prints_the_package_version(capsys):
     with pytest.raises(SystemExit) as exit_info:
         main(["--version"])
     assert exit_info.value.code == 0
-    assert capsys.readouterr().out == f"journal {__version__}\n"
+    assert capsys.readouterr().out == f"rythe {__version__}\n"
 
 
 def test_the_version_is_three_numbers():
