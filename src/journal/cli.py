@@ -54,7 +54,7 @@ import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import configcmd, docs, helpstyle, ingest, prompts, render, setup, store, transcribe, ui
+from . import __version__, configcmd, docs, helpstyle, ingest, prompts, render, setup, store, transcribe, ui
 from .config import config_path, load_config
 from .dates import (
     parse_date as _parse_date,
@@ -798,6 +798,9 @@ def build_parser() -> argparse.ArgumentParser:
         description="A date/time-based personal journal: $EDITOR to write, a CLI for everything else.",
         epilog=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--version", action="version", version=f"journal {__version__}", help="print the version and exit"
     )
     sub = parser.add_subparsers(dest="command")
 

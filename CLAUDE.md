@@ -87,8 +87,28 @@ users back it up however they like. Don't add backup or version-control features
 ## Working here
 
 - Install/reinstall after code changes: `uv tool install --editable .` (puts `journal` on
-  `~/.local/bin`, which is already on PATH — this project's own `bin/` is not used).
+  `~/.local/bin`, which is already on PATH; this project's `bin/` holds only `bin/release`).
 - Tests: `uv run pytest`.
 - Git: the remote is `github.com/apodacaa/journal` (private). Work lands on `main` through a pull
   request: branch, commit, push, `gh pr create`. The user decides when to merge (`gh pr merge
   --merge`, keeping each commit). Don't commit straight to `main`.
+
+## Versions and releases
+
+People install from GitHub and get whatever `main` is at, so **`main` always equals a released
+version**.
+
+- The version is written once, in `src/journal/__init__.py`; `pyproject.toml` reads it from there
+  and `journal --version` prints it.
+- A pull request that changes anything a user or a client can see bumps the version and adds an
+  entry at the top of `CHANGELOG.md`, in that same pull request. A test fails if the two disagree.
+  Changes nobody outside can see (tests, refactors, this file) don't bump it.
+- Semantic versioning. Before 1.0.0 a breaking change bumps the minor number. From 1.0.0 on, the
+  `--json` shapes, flags, exit codes and editor file names are frozen: breaking one is a new major
+  version.
+- After the pull request merges, `bin/release` on an up-to-date `main` runs the tests, tags
+  `v<version>`, pushes the tag and creates the GitHub release from the changelog entry.
+  `bin/release --dry-run` checks everything and publishes nothing. Tagging is the user's call, like
+  merging.
+- The clients (`../nvim`, `../omarchy-plugin`) each name the lowest CLI version they need in their
+  README. A client that needs something new waits for the CLI release that has it.

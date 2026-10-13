@@ -38,6 +38,9 @@ git clone https://github.com/apodacaa/journal && cd journal
 uv tool install .            # puts `journal` on your PATH (use --editable while developing)
 ```
 
+`journal --version` says which version you have, and [CHANGELOG.md](CHANGELOG.md) what changed in
+each.
+
 Optional, each with a plain fallback if missing: `fzf` (an entry picker for
 `journal edit` and `journal show`), a pager such as `less`, and `ffmpeg` plus `whisper-cpp` for
 voice memos.

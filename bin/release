@@ -1,0 +1,37 @@
+#!/bin/bash
+# Tag and publish the version `main` is at. Run it after the pull request that bumped the version
+# has merged. `bin/release --dry-run` does every check and prints what it would publish.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+fail() {
+  echo "release: $*" >&2
+  exit 1
+}
+
+version=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' src/journal/__init__.py)
+[[ -n $version ]] || fail "no version found in src/journal/__init__.py"
+tag="v$version"
+
+[[ $(git branch --show-current) == main ]] || fail "not on main"
+[[ -z $(git status --porcelain) ]] || fail "there are uncommitted changes"
+git fetch --quiet --tags origin
+[[ $(git rev-parse HEAD) == $(git rev-parse origin/main) ]] || fail "main is not what's on GitHub; pull or push first"
+if git rev-parse --quiet --verify "refs/tags/$tag" >/dev/null; then
+  fail "$tag already exists; bump the version in a pull request first"
+fi
+
+# The notes are this version's section of the changelog.
+notes=$(awk -v v="$version" '$1 == "##" { on = ($2 == v); next } on' CHANGELOG.md)
+[[ -n ${notes//[[:space:]]/} ]] || fail "CHANGELOG.md has no entry for $version"
+
+uv run pytest -q
+
+if [[ ${1:-} == --dry-run ]]; then
+  printf 'Would tag and release %s with these notes:\n%s\n' "$tag" "$notes"
+  exit 0
+fi
+
+git tag -a "$tag" -m "$tag"
+git push origin "$tag"
+gh release create "$tag" --title "$tag" --notes "$notes"
