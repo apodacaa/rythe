@@ -23,6 +23,14 @@ Returned by `new`, `add`, `show`, `tag`, `edit`, `ingest audio|text` and inside 
 }
 ```
 
+`new --json` and `add --json` add one more key, the older entry a person sees after saving (same
+day in a past year, else a month ago, else a week ago), or `null` when there is none or the
+`resurface.enabled` setting is off:
+
+```
+"resurfaced": {"label": "a week ago today", "entry": { …entry object… }}
+```
+
 ## Other shapes
 
 - `list --json`, `on-this-day --json`: an array of entry objects, newest first.
