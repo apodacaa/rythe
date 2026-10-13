@@ -89,7 +89,7 @@ users back it up however they like. Don't add backup or version-control features
 - Install/reinstall after code changes: `uv tool install --editable .` (puts `rythe` on
   `~/.local/bin`, which is already on PATH; this project's `bin/` holds only `bin/release`).
 - Tests: `uv run pytest`.
-- Git: the remote is `github.com/apodacaa/rythe` (private). Work lands on `main` through a pull
+- Git: the remote is `github.com/apodacaa/rythe` (public). Work lands on `main` through a pull
   request: branch, commit, push, `gh pr create`. The user decides when to merge (`gh pr merge
   --merge`, keeping each commit). Don't commit straight to `main`.
 
