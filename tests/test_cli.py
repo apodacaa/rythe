@@ -866,3 +866,76 @@ def test_edit_stdin_and_text_cannot_be_combined(capsys):
     entry_id = _new(capsys)
     with pytest.raises(SystemExit):
         main(["edit", entry_id, "--stdin", "--text", "both"])
+
+
+def test_prompts_pick_is_the_prompt_new_would_show_that_day(capsys):
+    from datetime import date
+
+    from journal import prompts
+
+    assert main(["prompts", "pick", "--date", "2026-10-08", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload == {"name": "today", "date": "2026-10-08", "prompt": prompts.pick("today", date(2026, 10, 8))}
+
+    assert main(["prompts", "pick", "hard", "--date", "2026-10-08"]) == 0
+    assert capsys.readouterr().out.strip() == prompts.pick("hard", date(2026, 10, 8))
+
+
+def test_prompts_pick_unknown_set_or_bad_date(capsys):
+    assert main(["prompts", "pick", "nope", "--json"]) == 2
+    assert "no prompt set 'nope'" in capsys.readouterr().err
+    assert main(["prompts", "pick", "--date", "someday", "--json"]) == 1
+
+
+def _seed(at, text):
+    assert main(["new", "--at", at, "--text", text, "--json"]) == 0
+
+
+def test_review_json_is_the_period_as_data_and_saves_nothing(capsys):
+    _seed("2026-09-30T09:00:00", "before the period")
+    _seed("2026-10-02T09:00:00", "first day")
+    _seed("2026-10-05T09:00:00", "later day")
+    _seed("2026-10-06T09:00:00", "an older review #review")
+    capsys.readouterr()
+
+    assert main(["review", "--since", "2026-10-01", "--until", "2026-10-07", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["title"] == "Review of Oct 1 – Oct 7"
+    assert payload["since"].startswith("2026-10-01T00:00:00")
+    assert payload["until"].startswith("2026-10-07")
+    assert [e["body"].strip() for e in payload["entries"]] == ["first day", "later day"]  # oldest first
+    from journal import prompts
+
+    assert payload["prompt"] in prompts.available()["review"]
+
+    assert main(["list", "--json"]) == 0
+    assert len(json.loads(capsys.readouterr().out)) == 4
+
+
+def test_review_json_defaults_to_the_last_seven_days(capsys):
+    assert main(["review", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["title"].startswith("Week of ")
+    assert payload["until"] is None
+    assert payload["entries"] == []
+
+
+def test_review_stdin_saves_a_titled_review_entry(monkeypatch, capsys):
+    import io
+
+    monkeypatch.setattr("sys.stdin", io.StringIO("it was a good week\n"))
+    assert main(["review", "--since", "2026-10-01", "--until", "2026-10-07", "--stdin", "--json"]) == 0
+    entry = json.loads(capsys.readouterr().out)
+    assert entry["title"] == "Review of Oct 1 – Oct 7"
+    assert entry["tags"] == ["review"]
+    assert entry["body"].startswith("it was a good week")
+
+
+def test_review_stdin_refuses_an_empty_reflection(monkeypatch, capsys):
+    import io
+
+    monkeypatch.setattr("sys.stdin", io.StringIO("  \n"))
+    assert main(["review", "--stdin", "--json"]) == 1
+    assert "no entry created" in capsys.readouterr().err
+    assert main(["list", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out) == []
