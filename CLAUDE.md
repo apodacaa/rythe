@@ -15,6 +15,9 @@ get swept in on demand via the `journal-sweep` skill, which transcribes locally 
 `whisper-cpp` and calls `journal ingest audio`. That skill lives globally in
 `~/.claude/skills/journal-sweep`, not in this repo — it's a client of the CLI.
 
+This repo lives in the `~/Work/journal` hub as `cli/`, beside its clients (`nvim/` is
+`journal.nvim`). The hub's `CLAUDE.md` has the rules that span them.
+
 ## Design rules
 
 - **Skills are clients of the app, not part of it.** `journal-sweep` is one way to drive the
