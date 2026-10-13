@@ -27,15 +27,19 @@ get swept in on demand via the `journal-sweep` skill, which transcribes locally 
   (name, type, default, description, example) and every built-in prompt set has a description in
   `prompts.py`. `journal config`, `journal prompts` and `journal docs` are generated from those
   and from the argparse parser, and tests fail if something exists undocumented. So: adding a
-  field to `config.py` means adding a `Setting`; a new built-in prompt set needs a
-  `DESCRIPTIONS` entry; a new command needs a `help=` (and flags need help text). Static guide
+  field to `config.py` means adding a `Setting` (a rule beyond its kind, like the language-code
+  check, goes in its `check` function, so `config set` and the wizard both apply it); a new
+  built-in prompt set needs a `DESCRIPTIONS` entry; a new command needs a `help=` (and flags need
+  help text). Static guide
   pages are `src/journal/docs/*.md` (overview, concepts, json, agents): update them when
   behaviour changes. `journal docs --all` is the agent guide; the README is the human one.
 - **The setup wizard is a thin layer.** `journal setup` (interactive, people only) asks about the
   settings in `setup.WIZARD_KEYS` and saves through the same validation and writer as
   `journal config set`; `journal setup --check --json` is the agent-friendly equivalent. It never
   launches on its own: the only nudge is a one-line tip after a person's first entry while no
-  config file exists. New wizard questions must use registry settings (a test checks).
+  config file exists. New wizard questions must use registry settings (a test checks). The one
+  thing it does beyond settings: when the folder changes it offers to move the journal there on
+  save, and puts `storage.dir` back if the move fails. Only the questions are numbered steps.
 - **Styling lives in `ui.py` only.** Human-facing output may use bold, color, boxes and glyphs via
   `ui` (the terminal's own 16 colors, so it follows the theme), never in `--json`, and
   `journal docs` prints raw markdown to anything but a terminal. Every styled command belongs in
