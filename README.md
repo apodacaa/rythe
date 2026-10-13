@@ -175,3 +175,7 @@ uv tool install --editable .         # reinstall after code changes
 ```
 
 Project rules and design decisions are in [CLAUDE.md](CLAUDE.md).
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
