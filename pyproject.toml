@@ -1,6 +1,6 @@
 [project]
 name = "journal"
-version = "0.1.0"
+dynamic = ["version"]
 description = "A date/time-based personal journal: $EDITOR to write, a CLI for everything else."
 requires-python = ">=3.11"
 license = "MIT"
@@ -20,6 +20,10 @@ dev = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+# The version is written once, in the package, so `journal --version` and the built package agree.
+[tool.hatch.version]
+path = "src/journal/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/journal"]
