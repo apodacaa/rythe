@@ -1,5 +1,5 @@
-"""File-backed storage for journal entries under the data directory (see `data_dir`: $JOURNAL_DIR,
-else the `storage.dir` setting, else ~/.local/share/journal).
+"""File-backed storage for journal entries under the data directory (see `data_dir`: $RYTHE_DIR,
+else the `storage.dir` setting, else ~/.local/share/rythe).
 
 Tags are never indexed: every read scans the body with tags.extract_tags. At journal scale a
 full directory scan on every command is fast enough, and there is no index to keep in sync.
@@ -28,12 +28,12 @@ class DuplicateMessageError(Exception):
         self.existing_id = existing_id
 
 
-DEFAULT_DATA_DIR = "~/.local/share/journal"
+DEFAULT_DATA_DIR = "~/.local/share/rythe"
 
 
 def data_dir() -> Path:
-    """Where entries live: $JOURNAL_DIR, else the `storage.dir` setting, else the default."""
-    override = os.environ.get("JOURNAL_DIR")
+    """Where entries live: $RYTHE_DIR, else the `storage.dir` setting, else the default."""
+    override = os.environ.get("RYTHE_DIR")
     if override:
         return Path(override)
     configured = load_config().storage.dir
@@ -58,10 +58,10 @@ def list_drafts() -> list[Path]:
     return sorted(root.glob("*.txt")) if root.exists() else []
 
 
-# Files the editor is opened on are named `journal-new-*.txt` (drafts here, edit copies in cli).
+# Files the editor is opened on are named `rythe-new-*.txt` (drafts here, edit copies in cli).
 # Treat that as a contract: editor configs match journal writing by this name (e.g. to turn off
 # completion or capital-letter spellcheck), and tests pin it.
-DRAFT_PREFIX = "journal-new-"
+DRAFT_PREFIX = "rythe-new-"
 
 
 def new_draft_path() -> Path:

@@ -1,4 +1,4 @@
-"""`journal config` and `journal prompts`: inspect and change settings, and explain them.
+"""`rythe config` and `rythe prompts`: inspect and change settings, and explain them.
 
 Everything here is driven by the registry in `settings.py` (and `prompts.py` for prompt sets), so
 what these commands report can't drift from what the app actually reads.
@@ -48,11 +48,11 @@ def _rows(raw: dict) -> list[dict]:
 
 
 def _unknown_key(key: str) -> int:
-    print(f"journal: unknown setting {key!r}", file=sys.stderr)
+    print(f"rythe: unknown setting {key!r}", file=sys.stderr)
     near = settings.suggestions(key)
     if near:
         print(f"  did you mean: {', '.join(near)}?", file=sys.stderr)
-    print("  `journal config list` shows every setting.", file=sys.stderr)
+    print("  `rythe config list` shows every setting.", file=sys.stderr)
     return 1
 
 
@@ -97,7 +97,7 @@ def cmd_config_list(args: argparse.Namespace) -> int:
         print(f"  {ui.style(f'{key:<{width}}', 'bold')}  {shown} {ui.style(note, 'dim')}")
     if unknown:
         print(ui.warn(f"unknown keys in the file (ignored): {', '.join(unknown)}"))
-    print(ui.style("`journal config explain [key]` says what a setting does; `journal docs config` has it all.", "dim"))
+    print(ui.style("`rythe config explain [key]` says what a setting does; `rythe docs config` has it all.", "dim"))
     return 0
 
 
@@ -119,7 +119,7 @@ def cmd_config_set(args: argparse.Namespace) -> int:
     setting = settings.lookup(args.key)
     if setting is None:
         return _unknown_key(args.key)
-    value = settings.coerce(setting, args.values)  # ValueError -> "journal: ..." exit 1 in main
+    value = settings.coerce(setting, args.values)  # ValueError -> "rythe: ..." exit 1 in main
     raw = load_raw()
     old_dir = store.data_dir() if args.key == "storage.dir" else None
     settings.set_in(raw, args.key, value)
@@ -132,7 +132,7 @@ def cmd_config_set(args: argparse.Namespace) -> int:
         print(f"set {args.key} = {_fmt(value)}")
     if backup:
         print(
-            f"journal: your config had comments, which rewriting drops; the old file is saved as {backup}",
+            f"rythe: your config had comments, which rewriting drops; the old file is saved as {backup}",
             file=sys.stderr,
         )
     return 0
@@ -140,16 +140,16 @@ def cmd_config_set(args: argparse.Namespace) -> int:
 
 def _storage_notes(old_dir) -> None:
     new_dir = store.data_dir()
-    if os.environ.get("JOURNAL_DIR"):
+    if os.environ.get("RYTHE_DIR"):
         print(
-            "journal: $JOURNAL_DIR is set and takes precedence, so it is still the folder in use; "
+            "rythe: $RYTHE_DIR is set and takes precedence, so it is still the folder in use; "
             "unset it for this setting to apply",
             file=sys.stderr,
         )
         return
     if new_dir != old_dir and old_dir.exists() and any(old_dir.iterdir()):
         print(
-            f"journal: entries already in {old_dir} were not moved; copy that whole folder to "
+            f"rythe: entries already in {old_dir} were not moved; copy that whole folder to "
             f"{new_dir} or they won't show up",
             file=sys.stderr,
         )
@@ -168,7 +168,7 @@ def cmd_config_unset(args: argparse.Namespace) -> int:
     print(f"unset {args.key} " + ("(it was an unused setting)" if stale else "(back to the default)"))
     if backup:
         print(
-            f"journal: your config had comments, which rewriting drops; the old file is saved as {backup}",
+            f"rythe: your config had comments, which rewriting drops; the old file is saved as {backup}",
             file=sys.stderr,
         )
     return 0
@@ -253,7 +253,7 @@ def cmd_prompts_list(args: argparse.Namespace) -> int:
         meta = f"[{r['source']}, {r['count']} prompt{'s' if r['count'] != 1 else ''}]"
         print(f"{ui.style(r['name'], 'bold', 'cyan')}  {ui.style(meta, 'dim')}")
         print(f"  {r['description']}")
-    print(ui.style("Use one with `journal write --prompt <name>`; add your own with `journal config set prompts.<name> \"…\"`.", "dim"))
+    print(ui.style("Use one with `rythe write --prompt <name>`; add your own with `rythe config set prompts.<name> \"…\"`.", "dim"))
     return 0
 
 
@@ -261,7 +261,7 @@ def cmd_prompts_show(args: argparse.Namespace) -> int:
     extra = _config_prompts()
     sets = prompts.available(extra)
     if args.name not in sets:
-        print(f"journal: no prompt set {args.name!r} (available: {', '.join(sorted(sets))})", file=sys.stderr)
+        print(f"rythe: no prompt set {args.name!r} (available: {', '.join(sorted(sets))})", file=sys.stderr)
         return 2
     row = {
         "name": args.name,

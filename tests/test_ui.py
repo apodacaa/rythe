@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-from journal import ui
-from journal.cli import main
+from rythe import ui
+from rythe.cli import main
 
 
 def test_style_is_plain_when_color_is_off_and_ansi_when_on():
@@ -38,9 +38,9 @@ def test_layout_helpers_line_up_with_and_without_color():
         ui.set_color(color)
         lines = ui.box("Summary", ["short", "a longer row of text"]).splitlines()
         assert len({ui.visible_len(line) for line in lines}) == 1  # a perfect rectangle
-        banner = ui.banner("journal setup").splitlines()
+        banner = ui.banner("rythe setup").splitlines()
         assert len({ui.visible_len(line) for line in banner}) == 1
-        assert "J O U R N A L" in ui.strip_ansi(banner[1])
+        assert "R Y T H E" in ui.strip_ansi(banner[1])
 
 
 def test_step_and_gutter_and_rule():
@@ -54,7 +54,7 @@ def test_ascii_fallback_when_the_terminal_is_not_utf8(monkeypatch):
     class Latin:
         encoding = "latin-1"
 
-    monkeypatch.setattr("journal.ui.sys.stdout", Latin())
+    monkeypatch.setattr("rythe.ui.sys.stdout", Latin())
     assert ui.glyph("arrow") == "->" and ui.glyph("ok") == "+"
     assert ui.glyph("box")[0] == "+"
 
@@ -159,13 +159,13 @@ Some **bold** text and `code` here.
 
 ## Section
 
-- a bullet with `journal add`
+- a bullet with `rythe add`
 1. a numbered step
 
 > a quoted note
 
 ```
-journal read --tag work
+rythe read --tag work
 ```
 
 | Code | Meaning |
@@ -179,7 +179,7 @@ journal read --tag work
 
 
 def test_style_markdown_renders_instead_of_showing_markup():
-    from journal import docs
+    from rythe import docs
 
     ui.set_color(True)
     out = docs.style_markdown(SAMPLE_MD)
@@ -187,28 +187,28 @@ def test_style_markdown_renders_instead_of_showing_markup():
     assert "\x1b[" in out
     for markup in ("```", "**", "`code`", "# Title", "## Section", "### Small"):
         assert markup not in plain, markup
-    for text in ("Title", "Section", "Small heading", "journal read --tag work", "a bullet with journal add",
+    for text in ("Title", "Section", "Small heading", "rythe read --tag work", "a bullet with rythe add",
                  "1. a numbered step", "a quoted note", "bold", "code"):
         assert text in plain, text
     assert "\n\n\n" not in plain  # no runs of blank lines
 
 
 def test_docs_on_a_terminal_are_styled_but_pipes_always_get_raw_markdown(capsys, monkeypatch):
-    from journal import docs
+    from rythe import docs
 
-    monkeypatch.setattr("journal.docs._on_terminal", lambda: True)
+    monkeypatch.setattr("rythe.docs._on_terminal", lambda: True)
     monkeypatch.setenv("FORCE_COLOR", "1")
     main(["docs", "json", "--no-pager"])
     styled = capsys.readouterr().out
     plain = ui.strip_ansi(styled)
-    assert "\x1b[" in styled and "```" not in plain and "# journal: JSON" not in plain
-    assert "journal: JSON output and exit codes" in plain  # the heading text is still there
+    assert "\x1b[" in styled and "```" not in plain and "# rythe: JSON" not in plain
+    assert "rythe: JSON output and exit codes" in plain  # the heading text is still there
 
     monkeypatch.undo()
     monkeypatch.setenv("FORCE_COLOR", "1")  # color forced, but stdout is a pipe here
     main(["docs", "json"])
     raw = capsys.readouterr().out
-    assert "\x1b" not in raw and raw.startswith("# journal: JSON output and exit codes")
+    assert "\x1b" not in raw and raw.startswith("# rythe: JSON output and exit codes")
     assert "```" in raw  # untouched markdown, exactly what agents rely on
 
 
@@ -229,10 +229,10 @@ def _help(argv, capsys):
     return capsys.readouterr().out
 
 
-@pytest.mark.parametrize("argv", HELP_ARGVS, ids=lambda a: " ".join(a) or "journal")
+@pytest.mark.parametrize("argv", HELP_ARGVS, ids=lambda a: " ".join(a) or "rythe")
 def test_styled_help_only_adds_escape_codes_never_changes_the_text(argv, capsys, monkeypatch):
     plain = _help(argv, capsys)
-    assert "\x1b" not in plain and "usage: journal" in plain
+    assert "\x1b" not in plain and "usage: rythe" in plain
 
     monkeypatch.setenv("FORCE_COLOR", "1")
     colored = _help(argv, capsys)
@@ -247,7 +247,7 @@ def test_styled_help_picks_out_headings_commands_flags_and_examples(capsys, monk
     assert ui.style("positional arguments:", "bold", "cyan") in top
     assert ui.style("add", "bold", "cyan") in top  # a command name in the list
     assert ui.style("Examples:", "bold", "cyan") in top
-    assert ui.style("journal status", "bold") in top  # an example command...
+    assert ui.style("rythe status", "bold") in top  # an example command...
     assert any(ui.style(line, "dim") in top for line in ("# last entry, entries this week; also --json",))  # ...and its comment
 
     sub = _help(["add"], capsys)
@@ -275,8 +275,8 @@ def test_help_follows_the_color_setting_and_no_color(capsys, monkeypatch):
 
 
 def test_help_still_works_when_the_config_file_is_unreadable(capsys):
-    from journal.config import config_path
+    from rythe.config import config_path
 
     config_path().parent.mkdir(parents=True, exist_ok=True)
     config_path().write_text("[appearance\n")
-    assert "usage: journal" in _help([], capsys)
+    assert "usage: rythe" in _help([], capsys)

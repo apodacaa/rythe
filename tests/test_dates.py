@@ -2,7 +2,7 @@ from datetime import date, datetime, time, timedelta, timezone
 
 import pytest
 
-from journal.dates import parse_date, parse_datetime, parse_range_end, parse_range_start
+from rythe.dates import parse_date, parse_datetime, parse_range_end, parse_range_start
 
 TZ = timezone(timedelta(hours=2))
 

@@ -2,13 +2,13 @@
 
 The prompt is never part of the entry: everything from the scissors line down is stripped when
 the draft is saved, like the comment block in a git commit message. Prompts are always opt-in
-(`--prompt`) — a bare `journal` stays a blank page.
+(`--prompt`) — a bare `rythe` stays a blank page.
 """
 from __future__ import annotations
 
 from datetime import date
 
-SCISSORS = "~~~~ journal: everything from this line down is removed when you save ~~~~"
+SCISSORS = "~~~~ rythe: everything from this line down is removed when you save ~~~~"
 
 BUILTIN: dict[str, list[str]] = {
     "today": [
@@ -37,7 +37,7 @@ BUILTIN: dict[str, list[str]] = {
 }
 
 
-# What each built-in set is for, shown by `journal prompts list` and `journal docs prompts`.
+# What each built-in set is for, shown by `rythe prompts list` and `rythe docs prompts`.
 DESCRIPTIONS: dict[str, str] = {
     "today": (
         "A light daily prompt (the default for --prompt): what stood out, a small win, a moment "
@@ -57,7 +57,7 @@ DESCRIPTIONS: dict[str, str] = {
         "mood for people at high risk of depression."
     ),
     "review": (
-        "Used by `journal review`: reflection questions for looking back over a stretch of "
+        "Used by `rythe review`: reflection questions for looking back over a stretch of "
         "entries (where your energy went, small progress, what's unresolved, what looks "
         "different now)."
     ),
@@ -69,7 +69,7 @@ SUMMARIES: dict[str, str] = {
     "today": "a light daily question (the default)",
     "hard": "expressive writing about something heavy",
     "distance": "write about a problem as an outside observer",
-    "review": "the questions `journal review` opens with",
+    "review": "the questions `rythe review` opens with",
 }
 
 

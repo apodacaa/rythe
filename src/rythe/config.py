@@ -1,4 +1,4 @@
-"""Load ~/.config/journal/config.toml. Every key is optional; missing keys fall back to defaults."""
+"""Load ~/.config/rythe/config.toml. Every key is optional; missing keys fall back to defaults."""
 from __future__ import annotations
 
 import json
@@ -9,8 +9,8 @@ from pathlib import Path
 
 
 def config_path() -> Path:
-    override = os.environ.get("JOURNAL_CONFIG")
-    return Path(override) if override else Path.home() / ".config/journal/config.toml"
+    override = os.environ.get("RYTHE_CONFIG")
+    return Path(override) if override else Path.home() / ".config/rythe/config.toml"
 
 
 @dataclass
@@ -65,7 +65,7 @@ def load_raw() -> dict:
 
 def _known(cls, table: dict) -> dict:
     """Only the keys `cls` defines: a stray or misspelled key is ignored instead of crashing
-    every command (`journal config list` reports such keys).
+    every command (`rythe config list` reports such keys).
     """
     names = {f.name for f in fields(cls)}
     return {k: v for k, v in table.items() if k in names}

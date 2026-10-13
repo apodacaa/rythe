@@ -3,9 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from journal import setup, settings, transcribe, ui
-from journal.config import config_path, load_raw
-from journal.cli import main
+from rythe import setup, settings, transcribe, ui
+from rythe.config import config_path, load_raw
+from rythe.cli import main
 
 
 def run(capsys, *argv):
@@ -16,7 +16,7 @@ def run(capsys, *argv):
 
 def test_check_json_shape_and_checks(capsys, monkeypatch):
     monkeypatch.setenv("EDITOR", "nano")
-    monkeypatch.setattr("journal.setup.shutil.which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr("rythe.setup.shutil.which", lambda name: f"/usr/bin/{name}")
 
     code, out, _ = run(capsys, "setup", "--check", "--json")
     report = json.loads(out)
@@ -30,8 +30,8 @@ def test_check_json_shape_and_checks(capsys, monkeypatch):
 
 
 def test_missing_tools_are_reported_with_what_they_enable(capsys, monkeypatch):
-    monkeypatch.setattr("journal.setup.shutil.which", lambda name: None)
-    monkeypatch.setattr("journal.cli.shutil.which", lambda name: None)
+    monkeypatch.setattr("rythe.setup.shutil.which", lambda name: None)
+    monkeypatch.setattr("rythe.cli.shutil.which", lambda name: None)
     monkeypatch.setenv("EDITOR", "no-such-editor")
 
     report = json.loads(run(capsys, "setup", "--check", "--json")[1])
@@ -49,7 +49,7 @@ def test_check_counts_entries(capsys):
 
 
 def test_plain_check_output(capsys, monkeypatch):
-    monkeypatch.setattr("journal.setup.shutil.which", lambda name: None if name == "fzf" else f"/usr/bin/{name}")
+    monkeypatch.setattr("rythe.setup.shutil.which", lambda name: None if name == "fzf" else f"/usr/bin/{name}")
     out = run(capsys, "setup", "--check")[1]
     assert "Your setup" in out
     assert any("missing" in l and "fzf" in l for l in out.splitlines())
@@ -85,10 +85,10 @@ class Session:
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    """A fake HOME with no JOURNAL_DIR, so the default data dir is inside tmp_path."""
-    monkeypatch.delenv("JOURNAL_DIR")
+    """A fake HOME with no RYTHE_DIR, so the default data dir is inside tmp_path."""
+    monkeypatch.delenv("RYTHE_DIR")
     monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.setattr("journal.setup.shutil.which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr("rythe.setup.shutil.which", lambda name: f"/usr/bin/{name}")
     return tmp_path
 
 
@@ -96,7 +96,7 @@ def test_accepting_every_default_changes_nothing(home):
     s = Session("", "", "", "")  # keep folder, resurface, no voice memos, no first entry
     assert s.run(start_entry=lambda: 0) == 0
     assert not config_path().exists()
-    assert "Nothing to change" in s.text and "journal docs" in s.text
+    assert "Nothing to change" in s.text and "rythe docs" in s.text
 
 
 def test_changing_one_answer_writes_only_that_key(home):
@@ -111,7 +111,7 @@ ENTRY = Path("entries") / "2026" / "01" / "2026-01-01T080000.txt"
 
 
 def _journal_with_one_entry(home) -> Path:
-    old = home / ".local" / "share" / "journal"
+    old = home / ".local" / "share" / "rythe"
     (old / ENTRY).parent.mkdir(parents=True)
     (old / ENTRY).write_text("---\ncreated: 2026-01-01T08:00:00+00:00\n---\nhi\n")
     return old
@@ -166,7 +166,7 @@ def test_a_failed_move_puts_the_folder_setting_back(home, monkeypatch):
     def failing(src, dst):
         raise OSError("disk full")
 
-    monkeypatch.setattr("journal.setup.shutil.move", failing)
+    monkeypatch.setattr("rythe.setup.shutil.move", failing)
     s = Session("n", str(new), "", "n", "", "y", "")  # move yes, resurfacing off, save
     assert s.run() == 0
     assert "Couldn't move your journal (disk full)" in s.text
@@ -187,8 +187,8 @@ def test_a_model_in_a_journal_that_is_moving_counts_as_downloaded(home):
 
 
 def test_journal_dir_env_skips_the_folder_question(tmp_path, monkeypatch):
-    monkeypatch.setattr("journal.setup.shutil.which", lambda name: f"/usr/bin/{name}")
-    s = Session("", "", "")  # resurface, voice, first entry (conftest sets JOURNAL_DIR)
+    monkeypatch.setattr("rythe.setup.shutil.which", lambda name: f"/usr/bin/{name}")
+    s = Session("", "", "")  # resurface, voice, first entry (conftest sets RYTHE_DIR)
     assert s.run(start_entry=lambda: 0) == 0
     assert "overrides the storage.dir setting" in s.text
     assert not any("Keep it here" in p for p in s.prompts)
@@ -236,13 +236,13 @@ def test_the_closing_question_only_says_first_entry_for_an_empty_journal(home):
 def test_an_entry_written_from_the_wizard_gets_no_setup_tip(capsys, monkeypatch):
     import sys
 
-    monkeypatch.setattr("journal.cli._interactive", lambda: True)
+    monkeypatch.setattr("rythe.cli._interactive", lambda: True)
     monkeypatch.setattr(sys.stdin, "isatty", lambda: True, raising=False)
     monkeypatch.setattr(sys.stdout, "isatty", lambda: True, raising=False)
-    monkeypatch.setattr("journal.setup.run_wizard", lambda start_entry: main(["add", "first, from setup"]))
+    monkeypatch.setattr("rythe.setup.run_wizard", lambda start_entry: main(["add", "first, from setup"]))
 
     assert main(["setup"]) == 0
-    assert "journal setup" not in capsys.readouterr().out
+    assert "rythe setup" not in capsys.readouterr().out
     assert not config_path().exists()
 
 
@@ -267,7 +267,7 @@ def test_setup_without_a_terminal_refuses_and_points_to_alternatives(capsys):
 
 
 def test_every_builtin_prompt_set_has_a_one_line_summary():
-    from journal import prompts
+    from rythe import prompts
 
     assert set(prompts.BUILTIN) == set(prompts.SUMMARIES)
 
@@ -304,7 +304,7 @@ def test_download_is_skipped_when_a_new_folder_was_not_saved(home):
 
 
 def test_already_downloaded_model_is_not_offered_again(home):
-    model = home / ".local" / "share" / "journal" / "models" / "ggml-small.bin"
+    model = home / ".local" / "share" / "rythe" / "models" / "ggml-small.bin"
     model.parent.mkdir(parents=True)
     model.write_bytes(b"x")
     calls, download = _downloads()
@@ -336,7 +336,7 @@ def test_voice_memo_defaults_follow_what_is_already_there(home):
     assert any("Download the small model now" in p and "[Y/n]" in p for p in s.prompts)
     assert calls == [("small", False)]
 
-    model = home / ".local" / "share" / "journal" / "models" / "ggml-small.bin"
+    model = home / ".local" / "share" / "rythe" / "models" / "ggml-small.bin"
     model.parent.mkdir(parents=True)
     model.write_bytes(b"x")
     s = Session("", "", "", "", "", "")
@@ -345,21 +345,21 @@ def test_voice_memo_defaults_follow_what_is_already_there(home):
 
 
 def test_missing_voice_tools_are_explained(home, monkeypatch):
-    monkeypatch.setattr("journal.setup.shutil.which", lambda name: None if name in ("ffmpeg", "whisper-cli") else "/x")
+    monkeypatch.setattr("rythe.setup.shutil.which", lambda name: None if name in ("ffmpeg", "whisper-cli") else "/x")
     s = Session("", "", "y", "", "", "n", "")
     s.run(download=_downloads()[1])
     assert "ffmpeg not found" in s.text and "whisper-cli not found" in s.text
 
 
 def test_failed_download_is_reported_and_setup_carries_on(home):
-    from journal.transcribe import TranscribeError
+    from rythe.transcribe import TranscribeError
 
     def failing(model):
         raise TranscribeError("network down")
 
     s = Session("", "", "y", "", "", "y", "", "")
     assert s.run(download=failing) == 0
-    assert "network down" in s.text and "journal model download small" in s.text
+    assert "network down" in s.text and "rythe model download small" in s.text
 
 
 def test_saying_no_to_voice_memos_asks_nothing_more(home):
@@ -369,50 +369,50 @@ def test_saying_no_to_voice_memos_asks_nothing_more(home):
 
 
 def test_first_entry_gets_a_one_time_setup_tip(capsys, monkeypatch):
-    monkeypatch.setattr("journal.cli._interactive", lambda: True)
+    monkeypatch.setattr("rythe.cli._interactive", lambda: True)
 
     main(["add", "my first entry"])
-    assert "journal setup" in capsys.readouterr().out
+    assert "rythe setup" in capsys.readouterr().out
 
     main(["add", "my second entry"])
-    assert "journal setup" not in capsys.readouterr().out
+    assert "rythe setup" not in capsys.readouterr().out
 
 
 def test_no_tip_once_a_config_file_exists_or_with_json_or_when_piped(capsys, monkeypatch):
-    monkeypatch.setattr("journal.cli._interactive", lambda: True)
+    monkeypatch.setattr("rythe.cli._interactive", lambda: True)
     main(["config", "set", "resurface.enabled", "true"])  # creates the config file
     capsys.readouterr()
     main(["add", "first, but configured"])
-    assert "journal setup" not in capsys.readouterr().out
+    assert "rythe setup" not in capsys.readouterr().out
 
 
 def test_no_tip_with_json_or_non_terminal(capsys, monkeypatch):
-    monkeypatch.setattr("journal.cli._interactive", lambda: True)
+    monkeypatch.setattr("rythe.cli._interactive", lambda: True)
     main(["add", "x", "--json"])
-    assert "journal setup" not in capsys.readouterr().out
+    assert "rythe setup" not in capsys.readouterr().out
 
 
 def test_docs_describe_setup_for_people_and_agents():
-    from journal import docs
+    from rythe import docs
 
-    assert "journal setup" in docs.render_topic("overview")
-    assert "journal setup --check" in docs.render_topic("agents")
+    assert "rythe setup" in docs.render_topic("overview")
+    assert "rythe setup --check" in docs.render_topic("agents")
     json_doc = docs.render_topic("json")
     for key in setup.environment_report():
         assert f'"{key}"' in json_doc, key
 
 
 def test_every_whisper_model_has_a_plain_language_note():
-    from journal import transcribe
+    from rythe import transcribe
 
     assert set(transcribe.MODEL_NOTES) == set(transcribe.KNOWN_MODELS)
     assert transcribe.RECOMMENDED_MODEL in transcribe.KNOWN_MODELS
 
 
 def test_model_list_in_the_wizard_explains_each_model_and_marks_downloaded(home):
-    from journal import transcribe
+    from rythe import transcribe
 
-    present = home / ".local" / "share" / "journal" / "models" / "ggml-base.bin"
+    present = home / ".local" / "share" / "rythe" / "models" / "ggml-base.bin"
     present.parent.mkdir(parents=True)
     present.write_bytes(b"x")
 
@@ -428,7 +428,7 @@ def test_model_list_in_the_wizard_explains_each_model_and_marks_downloaded(home)
 def test_declining_a_download_says_how_to_do_it_later(home):
     s = Session("", "", "y", "medium", "", "n", "")
     s.run(download=_downloads()[1])
-    assert "journal model download medium" in s.text
+    assert "rythe model download medium" in s.text
 
 
 def test_wizard_is_styled_when_color_is_on_and_plain_text_underneath(home):
@@ -437,7 +437,7 @@ def test_wizard_is_styled_when_color_is_on_and_plain_text_underneath(home):
     s.run()
     assert "\x1b[" in s.text  # styled
     plain = ui.strip_ansi(s.text)
-    assert "J O U R N A L   S E T U P" in plain and "1/3  WHERE SHOULD YOUR JOURNAL LIVE?" in plain
+    assert "R Y T H E   S E T U P" in plain and "1/3  WHERE SHOULD YOUR JOURNAL LIVE?" in plain
     assert "WRITING PROMPTS" in plain and "You're set" in plain
     assert "Saved to" in plain
 

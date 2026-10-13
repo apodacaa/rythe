@@ -1,4 +1,4 @@
-from journal.tags import extract_tags, normalize_tag
+from rythe.tags import extract_tags, normalize_tag
 
 
 def test_extracts_simple_tag():

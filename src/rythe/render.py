@@ -1,4 +1,4 @@
-"""Human-readable rendering of entries, for `journal read` and `journal show`.
+"""Human-readable rendering of entries, for `rythe read` and `rythe show`.
 
 This is for reading, not for scripts: scripts use `--json`, whose shape is a stable contract and
 is deliberately separate from anything in this module.

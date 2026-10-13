@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
-from journal.cli import _preview
-from journal.entry import Entry
+from rythe.cli import _preview
+from rythe.entry import Entry
 
 
 def entry(title="", body=""):

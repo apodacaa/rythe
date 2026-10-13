@@ -1,4 +1,4 @@
-# journal: concepts
+# rythe: concepts
 
 ## Entries and ids
 
@@ -25,57 +25,57 @@ hand (`yesterday`, `3 days ago`, `monday`), but agents should always use ISO. A 
 ## Tags
 
 Tags are `#words` inside the entry text (letters, digits, `_` and `-`, starting with a letter),
-matched case-insensitively. `journal tag <ref> <tag>…` appends missing tags as a final line.
-`journal tags` counts them. A `#` in a shell is a comment, so quote text or use `add -t`.
+matched case-insensitively. `rythe tag <ref> <tag>…` appends missing tags as a final line.
+`rythe tags` counts them. A `#` in a shell is a comment, so quote text or use `add -t`.
 
 ## Sources
 
 `cli` is anything written through the CLI or editor. `memo` is a voice memo transcribed with
-whisper.cpp (`journal ingest audio`); the original audio is kept. `text` is a file imported with
-`journal ingest text`. Ingests can carry a `--message-id` for de-duplication: re-ingesting the
+whisper.cpp (`rythe ingest audio`); the original audio is kept. `text` is a file imported with
+`rythe ingest text`. Ingests can carry a `--message-id` for de-duplication: re-ingesting the
 same id exits 3 unless `--force` is given.
 
 ## Safety nets
 
-- **Drafts:** the editor works on a file in `<data>/drafts` (named `journal-new-<time>.txt`; editor
-  configs can match journal writing by the `journal-new-*.txt` name, which edits use too). It's deleted only after the entry is
-  saved. If anything goes wrong (a crash, a killed editor, a failed save), the next `journal
+- **Drafts:** the editor works on a file in `<data>/drafts` (named `rythe-new-<time>.txt`; editor
+  configs can match journal writing by the `rythe-new-*.txt` name, which edits use too). It's deleted only after the entry is
+  saved. If anything goes wrong (a crash, a killed editor, a failed save), the next `rythe
   write` resumes the draft.
-- **Trash:** `journal delete` moves an entry (and its audio) to `<data>/.trash`; nothing is
+- **Trash:** `rythe delete` moves an entry (and its audio) to `<data>/.trash`; nothing is
   purged.
 - **Edits show only the body.** The editor never sees the frontmatter, so an edit can't corrupt
   it, and `updated` is stamped only when the text really changed. Emptying an entry is refused.
 
 ## Rereading
 
-- `journal read` prints a range as prose, oldest first, through your pager (default: the last 7
-  days). `journal show` prints one entry the same way (`--raw` for the stored file).
-- `journal on-this-day` lists entries from today's date in earlier years.
+- `rythe read` prints a range as prose, oldest first, through your pager (default: the last 7
+  days). `rythe show` prints one entry the same way (`--raw` for the stored file).
+- `rythe on-this-day` lists entries from today's date in earlier years.
 - After a new entry is saved on a terminal, one older entry is shown (same day in a past year,
   else a month ago, else a week ago). Setting `resurface.enabled` controls it.
-- `journal review` shows the period and then opens the editor with reflection questions. The
+- `rythe review` shows the period and then opens the editor with reflection questions. The
   result is saved as a titled entry tagged `#review`. Editor plugins and other clients do the
   same in two steps: `review --json` gives the period, title and question without saving
   anything, and `review --stdin` saves the reflection with that title and tag.
-- `journal prompts pick [SET]` prints the prompt `new --prompt` would show today; the choice is
+- `rythe prompts pick [SET]` prints the prompt `new --prompt` would show today; the choice is
   seeded by the date, so it's the same all day.
-- `journal status` says when you last wrote and how many entries this week (also `--json`), cheap
+- `rythe status` says when you last wrote and how many entries this week (also `--json`), cheap
   enough for a shell prompt or a scheduler.
 
 ## Data layout
 
-The data folder defaults to `~/.local/share/journal`. Choose another with
-`journal config set storage.dir <folder>` (absolute, or starting with `~`); the `JOURNAL_DIR`
-environment variable overrides that when set. `journal path` prints the folder in use.
+The data folder defaults to `~/.local/share/rythe`. Choose another with
+`rythe config set storage.dir <folder>` (absolute, or starting with `~`); the `RYTHE_DIR`
+environment variable overrides that when set. `rythe path` prints the folder in use.
 
 ```
-~/.local/share/journal/        (storage.dir, or JOURNAL_DIR)
+~/.local/share/rythe/          (storage.dir, or RYTHE_DIR)
   entries/2026/09/2026-09-30T164608.txt
   audio/2026-09-30T164608.m4a      original voice memos
   models/ggml-small.bin            whisper models (large; you can re-download them)
   drafts/                          unsaved editor drafts
   .trash/                          deleted entries
-~/.config/journal/config.toml      settings (override with JOURNAL_CONFIG)
+~/.config/rythe/config.toml        settings (override with RYTHE_CONFIG)
 ```
 
 Entry files are a small frontmatter block (`created`, `updated`, `source`, `title`, …) followed by
@@ -83,27 +83,27 @@ the text.
 
 ## Moving your journal
 
-Changing `storage.dir` only changes where the journal looks; it does not move files. To relocate
+Changing `storage.dir` only changes where rythe looks; it does not move files. To relocate
 an existing journal, move the whole folder (it contains the entries, audio and the rest),
-then point the setting at it (or change the folder in `journal setup`, which offers to move it
+then point the setting at it (or change the folder in `rythe setup`, which offers to move it
 for you):
 
 ```
-journal path                                   # the current folder, e.g. ~/.local/share/journal
-mv ~/.local/share/journal ~/Documents/journal
-journal config set storage.dir ~/Documents/journal
-journal list --limit 3                         # your entries are there
+rythe path                                   # the current folder, e.g. ~/.local/share/rythe
+mv ~/.local/share/rythe ~/Documents/journal
+rythe config set storage.dir ~/Documents/journal
+rythe list --limit 3                         # your entries are there
 ```
 
-If `JOURNAL_DIR` is set in your shell it wins over the setting, so unset it (or change it) too.
-`journal config set storage.dir` warns about both situations. Programs not started from your
+If `RYTHE_DIR` is set in your shell it wins over the setting, so unset it (or change it) too.
+`rythe config set storage.dir` warns about both situations. Programs not started from your
 shell (an agent, a scheduler) don't see shell variables, which is why the setting is the reliable
 choice.
 
 ## Backups
 
-The journal doesn't manage backups; how you keep copies is up to you. The whole journal is one
-ordinary folder of text files (`journal path` prints it), so anything that copies or syncs a folder
+rythe doesn't manage backups; how you keep copies is up to you. The whole journal is one
+ordinary folder of text files (`rythe path` prints it), so anything that copies or syncs a folder
 works: a synced folder, `rsync` or a scheduled copy to another disk, a backup tool, or your own git
 repository. The `models/` folder is large and can be re-downloaded, so you may want to leave it
 out.

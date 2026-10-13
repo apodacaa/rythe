@@ -1,7 +1,7 @@
-"""`journal setup`: check what this machine has and (interactively) walk through the options.
+"""`rythe setup`: check what this machine has and (interactively) walk through the options.
 
 The environment report is plain data so agents get the same picture a person does
-(`journal setup --check --json`).
+(`rythe setup --check --json`).
 """
 from __future__ import annotations
 
@@ -51,13 +51,13 @@ def environment_report() -> dict:
             "editor",
             editor_path is not None,
             " ".join(editor) if editor_path else "",
-            "writing entries (`journal`, `journal write`, `journal edit`)",
+            "writing entries (`rythe`, `rythe write`, `rythe edit`)",
             "set $EDITOR (for example `export EDITOR=nano`) or install nvim or vim",
         ),
         _tool(
             "fzf",
             "fzf",
-            "the entry picker for `journal edit` and `journal show` with no id",
+            "the entry picker for `rythe edit` and `rythe show` with no id",
             "install fzf; without it those commands use the last entry",
         ),
         _check(
@@ -70,21 +70,21 @@ def environment_report() -> dict:
         _tool(
             "ffmpeg",
             "ffmpeg",
-            "voice memos (`journal ingest audio`)",
+            "voice memos (`rythe ingest audio`)",
             "install ffmpeg with your package manager",
         ),
         _tool(
             "whisper-cli",
             "whisper-cli",
-            "voice memos (`journal ingest audio`)",
+            "voice memos (`rythe ingest audio`)",
             "install whisper.cpp (the package that provides `whisper-cli`)",
         ),
         _check(
             f"whisper model ({model})",
             model_file.exists(),
             str(model_file) if model_file.exists() else "",
-            "voice memos (`journal ingest audio`)",
-            f"run `journal model download {model}`",
+            "voice memos (`rythe ingest audio`)",
+            f"run `rythe model download {model}`",
         ),
     ]
     return {
@@ -179,7 +179,7 @@ class _Wizard:
 
     # -- steps ----------------------------------------------------------------------------
     def welcome(self, report: dict) -> None:
-        self.say(ui.banner("journal setup"))
+        self.say(ui.banner("rythe setup"))
         self.say(ui.style(
             " A few quick questions; press Enter to accept the default shown. Nothing is saved\n"
             " until the end, and you can run this again any time.", "dim"))
@@ -192,11 +192,11 @@ class _Wizard:
         current = store.data_dir()
         count = store.count_entries()
         self.heading(1, "Where should your journal live?")
-        if os.environ.get("JOURNAL_DIR"):
+        if os.environ.get("RYTHE_DIR"):
             self.info(
                 f"It's {ui.style(str(current), 'bold')}.",
                 ui.style(
-                    "The $JOURNAL_DIR environment variable is set and overrides the storage.dir "
+                    "The $RYTHE_DIR environment variable is set and overrides the storage.dir "
                     "setting, so there's nothing to choose here. Unset it to use the setting.",
                     "dim",
                 ),
@@ -234,7 +234,7 @@ class _Wizard:
         self.moved_from = current
         if not _is_free(target):
             self.say(" " + ui.warn(
-                f"{target} already has files in it, so journal will use what's there and your "
+                f"{target} already has files in it, so rythe will use what's there and your "
                 f"current journal stays in {current}."
             ))
         else:
@@ -244,7 +244,7 @@ class _Wizard:
         self.heading(2, "Bring up the past?")
         self.info(
             ui.style(
-                "After you save an entry, journal can show one older one (the same day last year, "
+                "After you save an entry, rythe can show one older one (the same day last year, "
                 "else a month or a week ago). Rereading is where a journal pays off.",
                 "dim",
             )
@@ -258,7 +258,7 @@ class _Wizard:
         self.heading(3, "Voice memos?")
         self.info(
             ui.style(
-                "journal can turn a recording into an entry, transcribing it on this computer with "
+                "rythe can turn a recording into an entry, transcribing it on this computer with "
                 "whisper.cpp (no audio ever leaves it).",
                 "dim",
             )
@@ -318,7 +318,7 @@ class _Wizard:
         elif self.yes_no(f"Download the {model} model now ({transcribe.format_size(model)})?", True):
             self.download = model
         else:
-            self.say(" " + ui.warn(f"Voice memos won't work until it's downloaded: `journal model download {model}`."))
+            self.say(" " + ui.warn(f"Voice memos won't work until it's downloaded: `rythe model download {model}`."))
 
     def _model_file(self, model: str) -> Path:
         """Where `model` will live: under the folder chosen in this run, if it changed. A journal
@@ -331,10 +331,10 @@ class _Wizard:
     def prompts_info(self) -> None:
         extra = load_config().prompts
         self.say("\n" + ui.heading("Writing prompts"))
-        rows = [ui.style("Always optional; a bare `journal` is a blank page.", "dim"), ""]
+        rows = [ui.style("Always optional; a bare `rythe` is a blank page.", "dim"), ""]
         for name in sorted(prompts.available(extra)):
             rows.append(f"{ui.style(f'{name:<9}', 'bold', 'cyan')} {prompts.SUMMARIES.get(name, 'your own set')}")
-        rows += ["", ui.style("Try one with `journal write --prompt hard`; `journal prompts list` says more.", "dim")]
+        rows += ["", ui.style("Try one with `rythe write --prompt hard`; `rythe prompts list` says more.", "dim")]
         self.info(*rows)
 
     def summary_and_save(self) -> bool:
@@ -440,16 +440,16 @@ def run_wizard(
                     say(" " + ui.ok("Done."))
                 except transcribe.TranscribeError as exc:
                     say(" " + ui.warn(f"Couldn't download it: {exc}"))
-                    say(f"   Try again later with `journal model download {wiz.download}`.")
+                    say(f"   Try again later with `rythe model download {wiz.download}`.")
         say("")
         code = 0
         which = "your first entry" if store.count_entries() == 0 else "an entry"
         if start_entry is not None and wiz.yes_no(f"Write {which} now?", False):
             code = start_entry()
         commands = [
-            ("journal add <words>", "capture a thought in one line"),
-            ("journal read", "reread your recent entries"),
-            ("journal docs", "the built-in guide"),
+            ("rythe add <words>", "capture a thought in one line"),
+            ("rythe read", "reread your recent entries"),
+            ("rythe docs", "the built-in guide"),
         ]
         rows = [f"{ui.style(f'{cmd:<20}', 'bold', 'cyan')} {text}" for cmd, text in commands]
         say("\n" + ui.box("You're set. Good next commands", rows))

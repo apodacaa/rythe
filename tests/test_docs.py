@@ -3,9 +3,9 @@ from datetime import datetime, timezone
 
 import pytest
 
-from journal import docs, settings
-from journal.cli import _entry_to_dict, build_parser, main
-from journal.entry import Entry
+from rythe import docs, settings
+from rythe.cli import _entry_to_dict, build_parser, main
+from rythe.entry import Entry
 
 
 def run(capsys, *argv):
@@ -15,7 +15,7 @@ def run(capsys, *argv):
 
 def test_every_topic_renders():
     for name in docs.TOPICS:
-        assert docs.render_topic(name).startswith("# journal"), name
+        assert docs.render_topic(name).startswith("# rythe"), name
 
 
 def test_list_json_and_unknown_topic(capsys):
@@ -26,10 +26,10 @@ def test_list_json_and_unknown_topic(capsys):
 
 def test_default_is_overview_with_topic_list_and_all_prints_everything(capsys):
     out = run(capsys, "docs")[1]
-    assert out.startswith("# journal: overview") and "Topics:" in out
+    assert out.startswith("# rythe: overview") and "Topics:" in out
 
     out = run(capsys, "docs", "--all")[1]
-    assert all(f"# journal: {t}" in out or t == "overview" for t in ("concepts", "commands", "configuration", "writing prompts"))
+    assert all(f"# rythe: {t}" in out or t == "overview" for t in ("concepts", "commands", "configuration", "writing prompts"))
     payload = json.loads(run(capsys, "docs", "config", "--json")[1])
     assert payload["topics"] == ["config"] and "resurface.enabled" in payload["markdown"]
 
@@ -39,10 +39,10 @@ def test_commands_doc_covers_every_command_and_subcommand():
     parser = build_parser()
     sub = docs._subparsers_action(parser)
     for name, child in sub.choices.items():
-        assert f"`journal {name}`" in text, name
+        assert f"`rythe {name}`" in text, name
         child_sub = docs._subparsers_action(child)
         for grand in (child_sub.choices if child_sub else []):
-            assert f"`journal {name} {grand}`" in text, (name, grand)
+            assert f"`rythe {name} {grand}`" in text, (name, grand)
 
 
 def test_no_flag_is_documented_with_a_blank_description():
@@ -60,7 +60,7 @@ def test_config_doc_covers_every_setting_and_env_var():
 
 
 def test_prompts_doc_covers_every_builtin_set():
-    from journal import prompts
+    from rythe import prompts
 
     text = docs.render_prompts()
     for name, items in prompts.BUILTIN.items():
@@ -81,9 +81,9 @@ def test_overview_links_every_other_topic():
     text = docs.render_topic("overview")
     for name in docs.TOPICS:
         if name != "overview":
-            assert f"journal docs {name}" in text, name
+            assert f"rythe docs {name}" in text, name
 
 
 def test_concepts_explains_choosing_and_moving_the_data_folder():
     text = docs.render_topic("concepts")
-    assert "storage.dir" in text and "JOURNAL_DIR" in text and "Moving your journal" in text
+    assert "storage.dir" in text and "RYTHE_DIR" in text and "Moving your journal" in text

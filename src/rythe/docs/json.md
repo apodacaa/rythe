@@ -1,4 +1,4 @@
-# journal: JSON output and exit codes
+# rythe: JSON output and exit codes
 
 `--json` output is a stable contract: its shape is treated as an API. Plain-text output (`read`,
 `show`, `status`, `review`, listings) is for people and may change, so scripts and agents should
@@ -70,4 +70,4 @@ form of `read`; use `list --json`.
 | 2 | not found (no such entry, file, or prompt set) |
 | 3 | duplicate (`ingest` with a `message_id` that already exists; retry with `--force` only if wanted) |
 
-Errors go to stderr as `journal: <message>`.
+Errors go to stderr as `rythe: <message>`.

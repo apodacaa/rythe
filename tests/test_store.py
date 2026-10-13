@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
-from journal import store
+from rythe import store
 
 TZ = timezone(timedelta(hours=2))
 
@@ -297,7 +297,7 @@ def test_delete_moves_audio_too(journal_dir):
 
 
 def test_writes_never_create_version_control_files_in_the_data_dir(journal_dir):
-    """The journal doesn't manage backups: no git repo, no .gitignore, nothing but its own files."""
+    """rythe doesn't manage backups: no git repo, no .gitignore, nothing but its own files."""
     entry = store.create(created=dt(8), body="hello")
     store.update_body(entry.id, "changed\n", dt(9))
     store.add_tags(entry.id, ["x"])

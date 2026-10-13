@@ -9,8 +9,8 @@ fail() {
   exit 1
 }
 
-version=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' src/journal/__init__.py)
-[[ -n $version ]] || fail "no version found in src/journal/__init__.py"
+version=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' src/rythe/__init__.py)
+[[ -n $version ]] || fail "no version found in src/rythe/__init__.py"
 tag="v$version"
 
 [[ $(git branch --show-current) == main ]] || fail "not on main"

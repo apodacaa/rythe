@@ -3,7 +3,7 @@
 Colors are the terminal's own 16 ANSI colors, never fixed RGB values, so everything automatically
 matches whatever theme the terminal uses (Omarchy's included). Styling is switched off when output
 isn't a terminal, with NO_COLOR, with TERM=dumb, or via the `appearance.color` setting, and it is
-never applied to --json or to the markdown that `journal docs` prints to a pipe, so scripts and
+never applied to --json or to the markdown that `rythe docs` prints to a pipe, so scripts and
 agents always see plain text.
 """
 from __future__ import annotations
