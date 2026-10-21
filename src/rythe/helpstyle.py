@@ -57,3 +57,8 @@ class RytheParser(argparse.ArgumentParser):
 
     def format_help(self) -> str:
         return style_help(super().format_help())
+
+    def error(self, message: str):
+        # argparse exits 2 here; rythe's exit 2 means "not found", and a usage error is 1.
+        self.print_usage(sys.stderr)
+        self.exit(1, f"{self.prog}: error: {message}\n")

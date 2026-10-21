@@ -5,6 +5,19 @@ What changed in each version, newest first. The version is in `src/rythe/__init_
 1.0.0 on, a change that breaks the `--json` output, a flag, an exit code or an editor file name
 is a new major version.
 
+## 0.2.1
+
+Fixes and small hints for people and agents driving the CLI.
+
+- **Usage errors exit `1`**, as the docs always said. A missing argument, a bad flag or an
+  unknown command used to exit `2`, which is also "not found", so a script couldn't tell them
+  apart.
+- **A bare `rythe config`** (also `prompts`, `ingest` and `model`) prints its sub-commands
+  instead of an error.
+- **`rythe config list --json`** has an `in_setup` field on each setting: true for the ones
+  `rythe setup` asks about, so an agent knows where to start. `config explain` and
+  `rythe docs config` say so too.
+
 ## 0.2.0
 
 **Renamed from `journal` to `rythe`.** "Journal" collided with too much, systemd's own journal

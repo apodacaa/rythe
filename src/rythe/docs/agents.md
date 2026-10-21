@@ -21,6 +21,9 @@ You are driving a person's private journal. These rules keep it safe and keep yo
 6. **Changing settings:** use `rythe config set <key> <value>` and `rythe config unset <key>`
    instead of editing `config.toml`. `config set` rewrites the file; if it had comments, they're
    saved to `config.toml.bak` and you should tell the person. Confirm with `rythe config get`.
+   To help someone configure rythe, read `rythe config list --json`: start with the settings
+   where `in_setup` is true, explain each from its `description`, show its `example`, and only
+   then change it.
 7. **Don't run `rythe setup`.** It's an interactive wizard for the person (it refuses to run
    without a terminal anyway). To learn what the machine has, use `rythe setup --check
    --json`; to change settings, use `rythe config set`.

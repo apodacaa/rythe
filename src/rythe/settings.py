@@ -26,6 +26,7 @@ class Setting:
     choices: tuple[str, ...] = ()
     default_text: str = ""  # how to show a default that isn't a plain value (e.g. a path)
     check: Callable[[str], str] | None = None  # extra validation: returns the value to store, or raises ValueError
+    in_setup: bool = False  # `rythe setup` asks about it: the settings most people want to look at first
 
 
 def _language(value: str) -> str:
@@ -50,6 +51,7 @@ SETTINGS: list[Setting] = [
         "offers to move them. `rythe path` prints the folder in use.",
         "rythe config set storage.dir ~/Documents/journal",
         default_text="~/.local/share/rythe",
+        in_setup=True,
     ),
     Setting(
         "appearance.color",
@@ -70,6 +72,7 @@ SETTINGS: list[Setting] = [
         "earlier year, else a month ago, else a week ago. Never shown with --json or when "
         "output is piped.",
         "rythe config set resurface.enabled false",
+        in_setup=True,
     ),
     Setting(
         "transcribe.model",
@@ -80,6 +83,7 @@ SETTINGS: list[Setting] = [
         "`rythe model download <name>`.",
         "rythe config set transcribe.model medium",
         tuple(KNOWN_MODELS),
+        in_setup=True,
     ),
     Setting(
         "transcribe.language",
@@ -89,6 +93,7 @@ SETTINGS: list[Setting] = [
         "whisper detect it per memo.",
         "rythe config set transcribe.language auto",
         check=_language,
+        in_setup=True,
     ),
     Setting(
         "memo.subject_prefix",

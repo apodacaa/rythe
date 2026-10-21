@@ -939,3 +939,22 @@ def test_review_stdin_refuses_an_empty_reflection(monkeypatch, capsys):
     assert "no entry created" in capsys.readouterr().err
     assert main(["list", "--json"]) == 0
     assert json.loads(capsys.readouterr().out) == []
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [["nosuchcommand"], ["list", "--bogus"], ["list", "--since"], ["config", "set", "storage.dir"], ["show", "a", "b"]],
+)
+def test_usage_errors_exit_1_never_2(argv, capsys):
+    # 2 means "not found"; the parser's own errors used to exit 2 as well
+    with pytest.raises(SystemExit) as exc:
+        main(argv)
+    assert exc.value.code == 1
+    assert "error:" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("group", ["config", "prompts", "ingest", "model"])
+def test_a_bare_command_group_lists_its_subcommands(group, capsys):
+    assert main([group]) == 0
+    out = capsys.readouterr().out
+    assert f"usage: rythe {group}" in out and "positional arguments" in out

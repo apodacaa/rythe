@@ -792,6 +792,16 @@ def _fill_flag_help(parser: argparse.ArgumentParser) -> None:
             action.help = _DEFAULT_FLAG_HELP[action.dest]
 
 
+def _show_help_of(parser: argparse.ArgumentParser):
+    """What a bare `rythe config` (or prompts, ingest, model) does: list its sub-commands."""
+
+    def run(args: argparse.Namespace) -> int:
+        parser.print_help()
+        return 0
+
+    return run
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = helpstyle.RytheParser(
         prog="rythe",
@@ -943,7 +953,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="see, explain and change settings (list, get, set, unset, explain, path)",
         description="Inspect and change the config file safely. `rythe docs config` documents every setting.",
     )
-    config_sub = p_config.add_subparsers(dest="config_command", required=True)
+    config_sub = p_config.add_subparsers(dest="config_command")
+    p_config.set_defaults(func=_show_help_of(p_config))
 
     p_cfg_list = config_sub.add_parser("list", help="every setting with its value, default and source")
     p_cfg_list.add_argument("--json", action="store_true")
@@ -982,7 +993,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_cfg_path.set_defaults(func=configcmd.cmd_config_path)
 
     p_prompts = sub.add_parser("prompts", help="list and show writing prompt sets (today, hard, distance, …)")
-    prompts_sub = p_prompts.add_subparsers(dest="prompts_command", required=True)
+    prompts_sub = p_prompts.add_subparsers(dest="prompts_command")
+    p_prompts.set_defaults(func=_show_help_of(p_prompts))
     p_pr_list = prompts_sub.add_parser("list", help="every prompt set, where it comes from, and what it is for")
     p_pr_list.add_argument("--json", action="store_true")
     p_pr_list.set_defaults(func=configcmd.cmd_prompts_list)
@@ -1065,7 +1077,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_path.set_defaults(func=cmd_path)
 
     p_ingest = sub.add_parser("ingest", help="pull external content (audio, text) into the journal")
-    ingest_sub = p_ingest.add_subparsers(dest="ingest_command", required=True)
+    ingest_sub = p_ingest.add_subparsers(dest="ingest_command")
+    p_ingest.set_defaults(func=_show_help_of(p_ingest))
 
     p_ingest_audio = ingest_sub.add_parser("audio", help="transcribe an audio file and create an entry")
     p_ingest_audio.add_argument("file")
@@ -1094,7 +1107,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_ingest_seen.set_defaults(func=cmd_ingest_seen)
 
     p_model = sub.add_parser("model", help="manage local whisper.cpp models")
-    model_sub = p_model.add_subparsers(dest="model_command", required=True)
+    model_sub = p_model.add_subparsers(dest="model_command")
+    p_model.set_defaults(func=_show_help_of(p_model))
 
     p_model_download = model_sub.add_parser("download", help="download a whisper.cpp model")
     p_model_download.add_argument("name", nargs="?", default="small", choices=list(transcribe.KNOWN_MODELS))

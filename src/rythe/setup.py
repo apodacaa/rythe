@@ -15,13 +15,9 @@ from . import prompts, settings, store, transcribe, ui
 from .config import config_path, load_config, load_raw, write_raw
 from .configcmd import _fmt
 
-# The settings the wizard asks about; a test checks each one is in the settings registry.
-WIZARD_KEYS = (
-    "storage.dir",
-    "resurface.enabled",
-    "transcribe.model",
-    "transcribe.language",
-)
+# The settings the wizard asks about: the registry marks them (`in_setup`), so `rythe config list --json`
+# can tell an agent which ones to start with.
+WIZARD_KEYS = tuple(s.key for s in settings.SETTINGS if s.in_setup)
 
 
 def _check(name: str, found: bool, detail: str, needed_for: str, hint: str) -> dict:

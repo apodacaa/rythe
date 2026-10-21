@@ -213,3 +213,13 @@ def test_a_leftover_history_section_from_an_older_version_is_ignored_and_can_be_
     assert code == 0 and "unused setting" in out
     assert load_raw() == {"transcribe": {"model": "medium"}}
     assert run(capsys, "config", "unset", "history.enabled")[0] == 1  # now it's simply unknown
+
+
+def test_config_list_json_marks_the_settings_setup_asks_about(capsys):
+    from rythe import setup
+
+    code, out, _ = run(capsys, "config", "list", "--json")
+    marked = [s["key"] for s in json.loads(out)["settings"] if s["in_setup"]]
+    assert code == 0 and marked == list(setup.WIZARD_KEYS) and marked
+    assert "asked by" in run(capsys, "config", "explain", marked[0])[1]
+    assert "asked by" not in run(capsys, "config", "explain", "appearance.color")[1]
