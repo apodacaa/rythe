@@ -1,0 +1,237 @@
+#!/usr/bin/env python3
+"""Move the AUR and Homebrew packages to a released version of rythe.
+
+Run by bin/release after it tags; run it by hand to retry or to catch up. The tag must already be
+on GitHub, because the package checksums are of its tarball.
+
+  aur-rythe       PKGBUILD pkgver and checksum, .SRCINFO, a commit on master, pushed to the AUR
+                  when the repo has a remote.
+  homebrew-rythe  Formula url and checksum, and the dependency resources rebuilt from uv.lock, on
+                  a branch with a pull request (merging it is the user's call).
+
+Both repos are expected beside this one in ~/Work/journal. A change that isn't wanted yet
+(--dry-run) shows diffs and touches nothing; --no-push commits locally and publishes nothing.
+"""
+import argparse
+import difflib
+import hashlib
+import json
+import re
+import subprocess
+import sys
+import tomllib
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+GITHUB = "apodacaa/rythe"
+
+
+def fail(message):
+    print(f"update-packages: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def git(repo, *args, capture=True):
+    result = subprocess.run(["git", "-C", str(repo), *args], capture_output=capture, text=True)
+    if result.returncode:
+        fail(f"git {' '.join(args)} failed in {repo.name}: {(result.stderr or '').strip()}")
+    return (result.stdout or "").strip()
+
+
+def fetch(url):
+    try:
+        with urllib.request.urlopen(url, timeout=60) as response:
+            return response.read()
+    except urllib.error.URLError as error:
+        fail(f"can't fetch {url}: {error}")
+
+
+def source_version():
+    text = (ROOT / "src/rythe/__init__.py").read_text()
+    found = re.search(r'^__version__ = "(.*)"$', text, re.M)
+    if not found:
+        fail("no version found in src/rythe/__init__.py")
+    return found.group(1)
+
+
+def tarball_sha(version):
+    # GitHub builds this archive from the tag, so it exists only once the tag is pushed.
+    return hashlib.sha256(fetch(f"https://github.com/{GITHUB}/archive/refs/tags/v{version}.tar.gz")).hexdigest()
+
+
+def runtime_dependencies():
+    """(direct, all) runtime dependencies of rythe as {name: version}, from uv.lock.
+
+    Dependencies with an environment marker (tzdata on Windows, say) are left out: the packages
+    are for Linux and macOS.
+    """
+    packages = {p["name"]: p for p in tomllib.loads((ROOT / "uv.lock").read_text())["package"]}
+
+    def names(name):
+        return [d["name"] for d in packages[name].get("dependencies", []) if "marker" not in d]
+
+    direct = names("rythe")
+    seen, todo = {}, list(direct)
+    while todo:
+        name = todo.pop()
+        if name not in seen:
+            seen[name] = packages[name]["version"]
+            todo.extend(names(name))
+    return {n: seen[n] for n in direct}, dict(sorted(seen.items()))
+
+
+def resource_blocks(dependencies):
+    blocks = []
+    for name, version in dependencies.items():
+        release = json.loads(fetch(f"https://pypi.org/pypi/{name}/{version}/json"))
+        sdist = next((u for u in release["urls"] if u["packagetype"] == "sdist"), None)
+        if not sdist:
+            fail(f"{name} {version} has no source archive on PyPI; the formula builds from source")
+        blocks.append(
+            f'  resource "{name}" do\n    url "{sdist["url"]}"\n    sha256 "{sdist["digests"]["sha256"]}"\n  end\n'
+        )
+    return "\n".join(blocks)
+
+
+def substitute(pattern, replacement, text, what, flags=0):
+    new, count = re.subn(pattern, lambda _: replacement, text, count=1, flags=flags)
+    if not count:
+        fail(f"can't find {what}; has its layout changed?")
+    return new
+
+
+def new_pkgbuild(text, version, sha, direct):
+    for name in direct:
+        arch = name if name.startswith("python-") else f"python-{name}"
+        if f"'{arch}'" not in re.search(r"^depends=.*$", text, re.M).group(0):
+            fail(f"PKGBUILD depends is missing '{arch}', a dependency in pyproject.toml; add it first")
+    old = re.search(r"^pkgver=(.*)$", text, re.M).group(1)
+    text = substitute(r"^pkgver=.*$", f"pkgver={version}", text, "pkgver", re.M)
+    if old != version:
+        text = substitute(r"^pkgrel=.*$", "pkgrel=1", text, "pkgrel", re.M)
+    return substitute(r"^sha256sums=\(.*\)$", f"sha256sums=('{sha}')", text, "sha256sums", re.M)
+
+
+def new_formula(text, version, sha, dependencies):
+    text = substitute(
+        r'url "https://github.com/[^"]*/archive/refs/tags/v[^"]*\.tar\.gz"\n  sha256 "[0-9a-f]{64}"',
+        f'url "https://github.com/{GITHUB}/archive/refs/tags/v{version}.tar.gz"\n  sha256 "{sha}"',
+        text,
+        "the formula url",
+    )
+    return substitute(
+        r'  resource ".*\n  end\n(?=\n  def install)',
+        resource_blocks(dependencies),
+        text,
+        "the formula resources",
+        re.S,
+    )
+
+
+def check_repo(repo, branch):
+    if not (repo / ".git").exists():
+        fail(f"{repo} isn't a git repo; clone or create it beside this one (or pass its path)")
+    if git(repo, "branch", "--show-current") != branch:
+        fail(f"{repo.name} isn't on {branch}")
+    if git(repo, "status", "--porcelain"):
+        fail(f"{repo.name} has uncommitted changes")
+
+
+def has_remote(repo):
+    return bool(git(repo, "remote"))
+
+
+def show_diff(name, old, new):
+    diff = "".join(difflib.unified_diff(old.splitlines(True), new.splitlines(True), f"a/{name}", f"b/{name}"))
+    print(diff or f"{name}: no change")
+    return bool(diff)
+
+
+def update_aur(repo, version, sha, direct, args):
+    path = repo / "PKGBUILD"
+    old = path.read_text()
+    new = new_pkgbuild(old, version, sha, direct)
+    if args.dry_run:
+        show_diff("aur-rythe/PKGBUILD", old, new)
+        return
+    if new == old:
+        print(f"aur-rythe: already at {version}")
+        return
+    path.write_text(new)
+    srcinfo = subprocess.run(["makepkg", "--printsrcinfo"], cwd=repo, capture_output=True, text=True)
+    if srcinfo.returncode:
+        path.write_text(old)
+        fail(f"makepkg --printsrcinfo failed: {srcinfo.stderr.strip()}")
+    (repo / ".SRCINFO").write_text(srcinfo.stdout)
+    pkgrel = re.search(r"^pkgrel=(.*)$", new, re.M).group(1)
+    git(repo, "commit", "-a", "-q", "-m", f"rythe {version}-{pkgrel}")
+    print(f"aur-rythe: committed rythe {version}-{pkgrel}")
+    if args.no_push:
+        return
+    if has_remote(repo):
+        git(repo, "push", "-q", "origin", "master")
+        print("aur-rythe: pushed to the AUR")
+    else:
+        print("aur-rythe: no remote yet, so nothing was pushed (the AUR account isn't set up)")
+
+
+def update_formula(repo, version, sha, dependencies, args):
+    path = repo / "Formula/rythe.rb"
+    old = path.read_text()
+    new = new_formula(old, version, sha, dependencies)
+    if args.dry_run:
+        show_diff("homebrew-rythe/Formula/rythe.rb", old, new)
+        return
+    if new == old:
+        print(f"homebrew-rythe: already at {version}")
+        return
+    branch = f"rythe-{version}"
+    if subprocess.run(["git", "-C", str(repo), "rev-parse", "--verify", "-q", branch], capture_output=True).returncode == 0:
+        print(f"homebrew-rythe: branch {branch} already exists; merge its pull request, or delete the branch to redo it")
+        return
+    git(repo, "checkout", "-q", "-b", branch)
+    path.write_text(new)
+    git(repo, "commit", "-a", "-q", "-m", f"rythe {version}")
+    print(f"homebrew-rythe: committed rythe {version} on {branch}")
+    if not args.no_push:
+        git(repo, "push", "-q", "-u", "origin", branch)
+        body = (
+            f"Moves the formula to rythe {version}: the release tarball's url and checksum, and the "
+            "dependency resources rebuilt from the CLI's `uv.lock`.\n\n"
+            "Not tested by the script. On a Mac, before merging:\n\n```\n"
+            "brew install --build-from-source ./Formula/rythe.rb\nbrew test rythe\n```\n"
+        )
+        pr = subprocess.run(
+            ["gh", "pr", "create", "--base", "main", "--head", branch, "--title", f"rythe {version}", "--body", body],
+            cwd=repo, capture_output=True, text=True,
+        )
+        if pr.returncode:
+            fail(f"the branch is pushed but gh pr create failed: {pr.stderr.strip()}")
+        print(f"homebrew-rythe: {pr.stdout.strip()}")
+    git(repo, "checkout", "-q", "main")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Update the AUR and Homebrew packages to a released rythe version.")
+    parser.add_argument("--version", help="the version to package (default: the one in the source)")
+    parser.add_argument("--dry-run", action="store_true", help="show what would change and touch nothing")
+    parser.add_argument("--no-push", action="store_true", help="commit locally; push and open nothing")
+    parser.add_argument("--aur-dir", type=Path, default=ROOT.parent / "aur-rythe")
+    parser.add_argument("--brew-dir", type=Path, default=ROOT.parent / "homebrew-rythe")
+    args = parser.parse_args()
+
+    version = args.version or source_version()
+    if not args.dry_run:
+        check_repo(args.aur_dir, "master")
+        check_repo(args.brew_dir, "main")
+    sha = tarball_sha(version)
+    direct, dependencies = runtime_dependencies()
+    print(f"rythe {version}, tarball sha256 {sha}")
+    update_aur(args.aur_dir, version, sha, direct, args)
+    update_formula(args.brew_dir, version, sha, dependencies, args)
+
+
+if __name__ == "__main__":
+    main()

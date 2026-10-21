@@ -110,5 +110,12 @@ version**.
   `v<version>`, pushes the tag and creates the GitHub release from the changelog entry.
   `bin/release --dry-run` checks everything and publishes nothing. Tagging is the user's call, like
   merging.
+- `bin/release` ends by running `bin/update-packages`, which moves the AUR package (`../aur-rythe`:
+  version, checksum, `.SRCINFO`, commit, push once the AUR remote exists) and the Homebrew formula
+  (`../homebrew-rythe`: url, checksum and dependency resources rebuilt from `uv.lock`, on a branch
+  with a pull request) to the new tag. It refuses a dirty repo and a `depends` that has drifted
+  from `pyproject.toml`; `--dry-run` shows the diffs. Run it again by hand if it failed. The formula
+  pull request waits for a Mac check and the user's merge. A new runtime dependency needs the
+  PKGBUILD `depends` edited first.
 - The clients (`../nvim`, `../omarchy-plugin`) each name the lowest CLI version they need in their
   README. A client that needs something new waits for the CLI release that has it.

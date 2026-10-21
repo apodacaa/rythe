@@ -29,9 +29,14 @@ uv run pytest -q
 
 if [[ ${1:-} == --dry-run ]]; then
   printf 'Would tag and release %s with these notes:\n%s\n' "$tag" "$notes"
+  echo "Then bin/update-packages would move the AUR and Homebrew packages to it."
   exit 0
 fi
 
 git tag -a "$tag" -m "$tag"
 git push origin "$tag"
 gh release create "$tag" --title "$tag" --notes "$notes"
+
+# The packages build from the tag that now exists. The release is out either way, so a failure here
+# is reported, not fatal: fix what it says and run bin/update-packages again.
+bin/update-packages || echo "release: $tag is out, but the packages weren't all updated; run bin/update-packages again" >&2
