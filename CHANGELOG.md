@@ -5,6 +5,21 @@ What changed in each version, newest first. The version is in `src/rythe/__init_
 1.0.0 on, a change that breaks the `--json` output, a flag, an exit code or an editor file name
 is a new major version.
 
+## 0.3.0
+
+**"On this day" is gone.** Nothing in the research on journaling shows that being shown old entries
+helps, and it can feed rumination, so rythe no longer surfaces them. Rereading stays: `rythe read`
+and the weekly `rythe review`. This is a breaking change, so check these:
+
+- **`rythe on-this-day` is removed.** It now fails as an unknown command (exit `1`).
+- **No older entry after you save.** The `resurface.enabled` setting, the matching question in
+  `rythe setup` (the wizard now has two steps, not three) and the `resurfaced` key in
+  `new --json` and `add --json` are all removed.
+- **`rythe status --json` no longer has `on_this_day_count`**, and the plain `status` output no
+  longer prints an "on this day" line. The other four fields are unchanged.
+- A `[resurface]` section left in your settings file is harmless: `rythe config list` reports it
+  under `unknown_keys`, and you can delete it.
+
 ## 0.2.1
 
 Fixes and small hints for people and agents driving the CLI.

@@ -250,31 +250,17 @@ def test_new_refuses_empty_text_without_creating_entry(args, stdin, monkeypatch,
     assert json.loads(capsys.readouterr().out) == []
 
 
-def test_new_json_includes_the_resurfaced_entry(capsys):
-    assert main(["new", "--at", "2026-09-24T08:00:00", "--text", "a week before", "--json"]) == 0
-    capsys.readouterr()
-    assert main(["new", "--at", "2026-10-01T09:00:00", "--text", "today", "--json"]) == 0
-    payload = json.loads(capsys.readouterr().out)
-    assert payload["body"] == "today"
-    assert payload["resurfaced"]["label"] == "a week ago today"
-    assert payload["resurfaced"]["entry"]["id"] == "2026-09-24T080000"
-    assert payload["resurfaced"]["entry"]["body"].strip() == "a week before"
-
-
-def test_new_and_add_json_resurfaced_is_null_when_nothing_or_turned_off(capsys):
-    assert main(["new", "--at", "2026-09-24T08:00:00", "--text", "first", "--json"]) == 0
-    assert json.loads(capsys.readouterr().out)["resurfaced"] is None
-    assert main(["config", "set", "resurface.enabled", "false"]) == 0
-    capsys.readouterr()
-    assert main(["add", "--at", "2026-10-01T09:00:00", "--json", "a", "week", "later"]) == 0
-    assert json.loads(capsys.readouterr().out)["resurfaced"] is None
-
-
-def test_show_json_has_no_resurfaced_key(capsys):
+def test_new_and_show_json_have_no_resurfaced_key(capsys):
     assert main(["new", "--text", "x", "--json"]) == 0
-    capsys.readouterr()
+    assert "resurfaced" not in json.loads(capsys.readouterr().out)
     assert main(["show", "last", "--json"]) == 0
     assert "resurfaced" not in json.loads(capsys.readouterr().out)
+
+
+def test_on_this_day_command_is_gone(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["on-this-day"])
+    assert exc.value.code == 1  # an unknown command is a usage error
 
 
 def test_show_missing_entry_returns_exit_code_2(capsys):
@@ -369,39 +355,6 @@ def test_list_untagged(capsys):
     assert main(["list", "--untagged"]) == 0
     out = capsys.readouterr().out
     assert out.count("[cli]") == 1
-
-
-def test_on_this_day_groups_by_year(capsys):
-    main(["new", "--at", "2025-09-30T09:00:00+02:00", "--text", "last year"])
-    main(["new", "--at", "2024-09-30T09:00:00+02:00", "--text", "two years ago"])
-    main(["new", "--at", "2025-10-01T09:00:00+02:00", "--text", "wrong day"])
-    capsys.readouterr()
-
-    assert main(["on-this-day", "--date", "2026-09-30"]) == 0
-    out = capsys.readouterr().out
-    assert "2025:" in out
-    assert "2024:" in out
-    assert "2025-09-30T090000" in out
-    assert "2025-10-01T090000" not in out
-    assert out.index("2025:") < out.index("2024:")
-    assert "last year" in out
-    assert "two years ago" in out
-
-
-def test_on_this_day_no_matches(capsys):
-    assert main(["on-this-day", "--date", "2026-09-30"]) == 0
-    out = capsys.readouterr().out
-    assert "nothing written" in out
-
-
-def test_on_this_day_json(capsys):
-    main(["new", "--at", "2025-09-30T09:00:00+02:00", "--text", "last year #work"])
-    capsys.readouterr()
-
-    assert main(["on-this-day", "--date", "2026-09-30", "--json"]) == 0
-    payload = json.loads(capsys.readouterr().out)
-    assert len(payload) == 1
-    assert payload[0]["tags"] == ["work"]
 
 
 def test_tag_command_appends_and_reports(capsys):
@@ -641,11 +594,10 @@ def test_status_empty_journal(capsys):
         "last_entry_at": None,
         "days_since": None,
         "week_count": 0,
-        "on_this_day_count": 0,
     }
 
 
-def test_status_reports_last_entry_week_count_and_on_this_day(capsys):
+def test_status_reports_last_entry_and_week_count(capsys):
     from datetime import datetime, timedelta, timezone
 
     from rythe.cli import _status
@@ -659,7 +611,7 @@ def test_status_reports_last_entry_week_count_and_on_this_day(capsys):
     assert status["last_entry_id"] == "2026-10-01T080000"
     assert status["days_since"] == 3
     assert status["week_count"] == 1
-    assert status["on_this_day_count"] == 1
+    assert "on_this_day_count" not in status
 
 
 def test_status_plain_output(capsys):
@@ -681,7 +633,7 @@ def test_help_documents_new_behaviour(capsys):
     assert "rythe config list" in help_of() and "rythe docs" in help_of()
     assert "frontmatter" in help_of("edit") and "fzf" in help_of("edit")
     assert "--raw" in help_of("show") or "raw" in help_of("show")
-    assert "on_this_day_count" in help_of("status")
+    assert "week_count" in help_of("status")
     assert "review" in help_of("write") and "#review" in help_of("review")
 
 

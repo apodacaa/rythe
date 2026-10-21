@@ -25,11 +25,6 @@ class MemoConfig:
 
 
 @dataclass
-class ResurfaceConfig:
-    enabled: bool = True
-
-
-@dataclass
 class StorageConfig:
     dir: str | None = None  # None means the default location (see store.data_dir)
 
@@ -43,7 +38,6 @@ class AppearanceConfig:
 class Config:
     transcribe: TranscribeConfig = field(default_factory=TranscribeConfig)
     memo: MemoConfig = field(default_factory=MemoConfig)
-    resurface: ResurfaceConfig = field(default_factory=ResurfaceConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
     appearance: AppearanceConfig = field(default_factory=AppearanceConfig)
     prompts: dict[str, list[str]] = field(default_factory=dict)
@@ -76,7 +70,6 @@ def load_config() -> Config:
     return Config(
         transcribe=TranscribeConfig(**_known(TranscribeConfig, raw.get("transcribe", {}))),
         memo=MemoConfig(**_known(MemoConfig, raw.get("memo", {}))),
-        resurface=ResurfaceConfig(**_known(ResurfaceConfig, raw.get("resurface", {}))),
         storage=StorageConfig(**_known(StorageConfig, raw.get("storage", {}))),
         appearance=AppearanceConfig(**_known(AppearanceConfig, raw.get("appearance", {}))),
         prompts={name: list(items) for name, items in raw.get("prompts", {}).items()},

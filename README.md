@@ -20,9 +20,8 @@ $ rythe review               # read your week, then write a reflection
 - **Your words are safe.** Unsaved drafts survive a crash, deletes only move files to a trash
   folder, and an edit never exposes the file's metadata to the editor. Backups are yours to choose:
   the journal is one folder of plain text, so any way you already back up a folder works.
-- **Rereading is the point.** Ordinary days are worth more later than they seem. `rythe read`,
-  `rythe on-this-day`, an older entry shown after you save a new one, and a weekly
-  `rythe review` are all built in.
+- **Rereading is the point.** Ordinary days are worth more later than they seem. `rythe read`
+  and a weekly `rythe review` are built in.
 - **It's plain files.** Entries are `.txt` files you can read, grep and back up without this
   tool, in a folder you control.
 - **It looks the part.** On a terminal you get bold headers, a colored guided setup, highlighted
@@ -110,7 +109,6 @@ Tags are `#words` inside the text. In a shell, `#` starts a comment, so quote th
 ```
 rythe read                         # the last 7 days, oldest first, through your pager
 rythe read --since 2026-09-01 --tag work
-rythe on-this-day                  # entries from today's date in earlier years
 rythe search "coffee" --tag morning
 rythe show last                    # or today, or a prefix like 2026-09-30
 rythe status                       # when you last wrote; handy in a prompt or a scheduler
@@ -148,9 +146,9 @@ Everything is optional. See and change settings from the CLI instead of hunting 
 
 ```
 rythe config list                  # every setting: value, default, where it came from
-rythe config explain resurface.enabled
-rythe config set resurface.enabled false
-rythe config unset resurface.enabled
+rythe config explain appearance.color
+rythe config set appearance.color never
+rythe config unset appearance.color
 ```
 
 Appearance: colors and bold are on for terminals and off when piped, with `--json`, or when

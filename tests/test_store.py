@@ -84,32 +84,6 @@ def test_list_filters_by_untagged():
     assert results[0].body.strip() == "no tags here"
 
 
-def test_on_this_day_matches_month_and_day_across_years():
-    store.create(created=dt_on(2024, 9, 30), body="two years ago")
-    store.create(created=dt_on(2025, 9, 30), body="last year")
-    store.create(created=dt_on(2025, 10, 1), body="a day off, wrong date")
-    store.create(created=dt_on(2026, 9, 30), body="this year")
-
-    results = store.on_this_day(date(2026, 9, 30))
-
-    assert [e.body.strip() for e in results] == ["this year", "last year", "two years ago"]
-
-
-def test_on_this_day_respects_tag_filter():
-    store.create(created=dt_on(2025, 9, 30), body="#work last year")
-    store.create(created=dt_on(2024, 9, 30), body="#personal two years ago")
-
-    results = store.on_this_day(date(2026, 9, 30), tags=["work"])
-
-    assert len(results) == 1
-    assert "work" in results[0].body
-
-
-def test_on_this_day_no_matches_returns_empty_list():
-    store.create(created=dt_on(2025, 5, 1), body="unrelated date")
-    assert store.on_this_day(date(2026, 9, 30)) == []
-
-
 def test_list_sorted_newest_first():
     store.create(created=dt(8), body="first")
     store.create(created=dt(20), body="second")

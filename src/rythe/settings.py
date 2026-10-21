@@ -18,7 +18,7 @@ PROMPT_NAME_RE = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
 
 @dataclass(frozen=True)
 class Setting:
-    key: str  # dotted, e.g. "resurface.enabled"
+    key: str  # dotted, e.g. "appearance.color"
     kind: str  # "bool" | "choice" | "text" | "path" | "list"
     default: object
     description: str
@@ -63,16 +63,6 @@ SETTINGS: list[Setting] = [
         "terminal's own 16-color palette, so they follow your terminal theme.",
         "rythe config set appearance.color never",
         ("auto", "always", "never"),
-    ),
-    Setting(
-        "resurface.enabled",
-        "bool",
-        True,
-        "After you save a new entry in a terminal, show one older entry: the same day in an "
-        "earlier year, else a month ago, else a week ago. Never shown with --json or when "
-        "output is piped.",
-        "rythe config set resurface.enabled false",
-        in_setup=True,
     ),
     Setting(
         "transcribe.model",

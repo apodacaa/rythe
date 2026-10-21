@@ -117,7 +117,7 @@ def render_report(report: dict) -> str:
     return "\n".join(lines)
 
 
-TOTAL_STEPS = 3  # folder, resurfacing, voice memos (the prompts section after them asks nothing)
+TOTAL_STEPS = 2  # folder, voice memos (the prompts section after them asks nothing)
 
 
 def _is_free(folder: Path) -> bool:
@@ -236,22 +236,8 @@ class _Wizard:
         else:
             self.move = self.yes_no(f"Move your journal{entries} there too?", True)
 
-    def resurface(self) -> None:
-        self.heading(2, "Bring up the past?")
-        self.info(
-            ui.style(
-                "After you save an entry, rythe can show one older one (the same day last year, "
-                "else a month or a week ago). Rereading is where a journal pays off.",
-                "dim",
-            )
-        )
-        self.propose(
-            "resurface.enabled",
-            self.yes_no("Show an older entry after I save one?", bool(self.current("resurface.enabled"))),
-        )
-
     def voice_memos(self) -> None:
-        self.heading(3, "Voice memos?")
+        self.heading(2, "Voice memos?")
         self.info(
             ui.style(
                 "rythe can turn a recording into an entry, transcribing it on this computer with "
@@ -422,7 +408,6 @@ def run_wizard(
         say("")
         wiz.welcome(environment_report())
         wiz.folder()
-        wiz.resurface()
         wiz.voice_memos()
         wiz.prompts_info()
         saved = wiz.summary_and_save()

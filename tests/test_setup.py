@@ -93,18 +93,18 @@ def home(tmp_path, monkeypatch):
 
 
 def test_accepting_every_default_changes_nothing(home):
-    s = Session("", "", "", "")  # keep folder, resurface, no voice memos, no first entry
+    s = Session("", "", "")  # keep folder, no voice memos, no first entry
     assert s.run(start_entry=lambda: 0) == 0
     assert not config_path().exists()
     assert "Nothing to change" in s.text and "rythe docs" in s.text
 
 
 def test_changing_one_answer_writes_only_that_key(home):
-    s = Session("", "n", "", "y", "")  # resurfacing off, no voice memos, then save
-    assert s.run() == 0
-    assert load_raw() == {"resurface": {"enabled": False}}
-    line = next(l for l in s.text.splitlines() if "resurface.enabled" in l and "true" in l)
-    assert "false" in line and ui.glyph("arrow") in line
+    s = Session("", "y", "medium", "", "n", "y", "")  # voice yes, model medium, no download, then save
+    assert s.run(download=_downloads()[1]) == 0
+    assert load_raw() == {"transcribe": {"model": "medium"}}
+    line = next(l for l in s.text.splitlines() if "transcribe.model" in l and "small" in l)
+    assert "medium" in line and ui.glyph("arrow") in line
 
 
 ENTRY = Path("entries") / "2026" / "01" / "2026-01-01T080000.txt"
@@ -121,7 +121,7 @@ def test_bad_folder_is_asked_again_then_the_journal_moves_on_save(home):
     old = _journal_with_one_entry(home)
     new = home / "Documents" / "journal"
 
-    s = Session("n", "relative/path", str(new), "", "", "", "y", "")  # ..., move (default yes), ...
+    s = Session("n", "relative/path", str(new), "", "", "y", "")  # ..., move (default yes), ...
     assert s.run() == 0
     assert "must be an absolute path" in s.text
     assert any("Move your journal (1 entry) there too? [Y/n]" in p for p in s.prompts)
@@ -133,7 +133,7 @@ def test_bad_folder_is_asked_again_then_the_journal_moves_on_save(home):
 def test_nothing_moves_when_the_final_save_is_declined(home):
     old = _journal_with_one_entry(home)
     new = home / "Documents" / "journal"
-    s = Session("n", str(new), "", "", "", "n", "")
+    s = Session("n", str(new), "", "", "n", "")
     assert s.run() == 0
     assert (old / ENTRY).exists() and not new.exists() and not config_path().exists()
 
@@ -141,7 +141,7 @@ def test_nothing_moves_when_the_final_save_is_declined(home):
 def test_declining_the_move_leaves_the_entries_and_says_how_to_copy_them(home):
     old = _journal_with_one_entry(home)
     new = home / "Documents" / "journal"
-    s = Session("n", str(new), "n", "", "", "y", "")
+    s = Session("n", str(new), "n", "", "y", "")
     assert s.run() == 0
     assert load_raw() == {"storage": {"dir": str(new)}}
     assert (old / ENTRY).exists()
@@ -152,7 +152,7 @@ def test_a_folder_that_already_has_files_is_used_as_is_and_nothing_moves(home):
     old = _journal_with_one_entry(home)
     new = home / "Documents" / "journal"
     (new / "entries").mkdir(parents=True)
-    s = Session("n", str(new), "", "", "y", "")  # no move question this time
+    s = Session("n", str(new), "", "y", "")  # no move question this time
     assert s.run() == 0
     assert not any("Move your journal" in p for p in s.prompts)
     assert "already has files in it" in s.text and f"cp -a {old}/. {new}/" in s.text
@@ -167,10 +167,10 @@ def test_a_failed_move_puts_the_folder_setting_back(home, monkeypatch):
         raise OSError("disk full")
 
     monkeypatch.setattr("rythe.setup.shutil.move", failing)
-    s = Session("n", str(new), "", "n", "", "y", "")  # move yes, resurfacing off, save
-    assert s.run() == 0
+    s = Session("n", str(new), "", "y", "medium", "", "n", "y", "")  # move yes, voice medium, save
+    assert s.run(download=_downloads()[1]) == 0
     assert "Couldn't move your journal (disk full)" in s.text
-    assert load_raw() == {"resurface": {"enabled": False}}  # the other answer is kept
+    assert load_raw() == {"transcribe": {"model": "medium"}}  # the other answer is kept
     assert (old / ENTRY).exists()
 
 
@@ -180,7 +180,7 @@ def test_a_model_in_a_journal_that_is_moving_counts_as_downloaded(home):
     (old / "models" / "ggml-small.bin").write_bytes(b"x")
     new = home / "Documents" / "journal"
     calls, download = _downloads()
-    s = Session("n", str(new), "", "", "", "", "", "y", "")  # move, resurface, voice (default yes), model, language, save
+    s = Session("n", str(new), "", "", "", "", "y", "")  # move, voice (default yes), model, language, save
     assert s.run(download=download) == 0
     assert "already downloaded" in s.text and calls == []
     assert (new / "models" / "ggml-small.bin").exists()
@@ -188,46 +188,46 @@ def test_a_model_in_a_journal_that_is_moving_counts_as_downloaded(home):
 
 def test_journal_dir_env_skips_the_folder_question(tmp_path, monkeypatch):
     monkeypatch.setattr("rythe.setup.shutil.which", lambda name: f"/usr/bin/{name}")
-    s = Session("", "", "")  # resurface, voice, first entry (conftest sets RYTHE_DIR)
+    s = Session("", "")  # voice, first entry (conftest sets RYTHE_DIR)
     assert s.run(start_entry=lambda: 0) == 0
     assert "overrides the storage.dir setting" in s.text
     assert not any("Keep it here" in p for p in s.prompts)
 
 
 def test_cancelling_before_the_summary_changes_nothing(home):
-    s = Session("", "n")  # then EOF
+    s = Session("", "y")  # voice yes, then EOF at the model question
     assert s.run() == 130
     assert "Nothing was changed" in s.text and not config_path().exists()
 
 
 def test_declining_the_final_save_writes_nothing(home):
-    s = Session("", "n", "", "n", "")
+    s = Session("", "y", "medium", "", "n", "n")
     assert s.run() == 0
     assert "Nothing was saved" in s.text and not config_path().exists()
 
 
 def test_rerun_shows_current_values_as_the_defaults(home):
-    main(["config", "set", "resurface.enabled", "false"])
-    s = Session("", "", "", "")
-    s.run()
-    assert any("Show an older entry after I save one? [y/N]" in p for p in s.prompts)
-    assert load_raw() == {"resurface": {"enabled": False}}  # unchanged by accepting defaults
+    main(["config", "set", "transcribe.model", "medium"])
+    s = Session("", "y", "", "", "n")
+    s.run(download=_downloads()[1])
+    assert any("Which model?" in p and "[medium]" in p for p in s.prompts)
+    assert load_raw() == {"transcribe": {"model": "medium"}}  # unchanged by accepting defaults
 
 
 def test_stopping_after_the_save_does_not_claim_nothing_changed(home):
-    s = Session("", "n", "", "y")  # saved, then EOF at the first-entry question
-    assert s.run(start_entry=lambda: 0) == 130
-    assert load_raw() == {"resurface": {"enabled": False}}
+    s = Session("", "y", "medium", "", "n", "y")  # saved, then EOF at the first-entry question
+    assert s.run(start_entry=lambda: 0, download=_downloads()[1]) == 130
+    assert load_raw() == {"transcribe": {"model": "medium"}}
     assert "already saved" in s.text and "Nothing was changed" not in s.text
 
 
 def test_the_closing_question_only_says_first_entry_for_an_empty_journal(home):
-    s = Session("", "", "", "")
+    s = Session("", "", "")
     s.run(start_entry=lambda: 0)
     assert any("Write your first entry now?" in p for p in s.prompts)
 
     _journal_with_one_entry(home)
-    s = Session("", "", "", "")
+    s = Session("", "", "")
     s.run(start_entry=lambda: 0)
     assert any("Write an entry now?" in p for p in s.prompts)
     assert not any("first entry" in p for p in s.prompts)
@@ -248,10 +248,10 @@ def test_an_entry_written_from_the_wizard_gets_no_setup_tip(capsys, monkeypatch)
 
 def test_first_entry_is_offered_and_started_on_yes(home):
     started = []
-    Session("", "", "", "y").run(start_entry=lambda: started.append(1) or 0)
+    Session("", "", "y").run(start_entry=lambda: started.append(1) or 0)
     assert started == [1]
     started.clear()
-    Session("", "", "", "n").run(start_entry=lambda: started.append(1) or 0)
+    Session("", "", "n").run(start_entry=lambda: started.append(1) or 0)
     assert started == []
 
 
@@ -279,7 +279,7 @@ def _downloads():
 
 def test_voice_memo_answers_are_saved_and_download_can_be_declined(home):
     calls, download = _downloads()
-    s = Session("", "", "y", "medium", "auto", "n", "y", "")  # ... model, language, no download, save
+    s = Session("", "y", "medium", "auto", "n", "y", "")  # ... model, language, no download, save
     assert s.run(download=download) == 0
     assert load_raw() == {"transcribe": {"model": "medium", "language": "auto"}}
     assert calls == []
@@ -289,7 +289,7 @@ def test_voice_memo_answers_are_saved_and_download_can_be_declined(home):
 def test_download_runs_after_the_config_is_saved_in_the_new_folder(home):
     calls, download = _downloads()
     new = home / "Documents" / "journal"
-    s = Session("n", str(new), "", "y", "", "", "y", "y", "")  # folder, voice(small, en), download, save
+    s = Session("n", str(new), "y", "", "", "y", "y", "")  # folder, voice(small, en), download, save
     assert s.run(download=download) == 0
     assert calls == [("small", True)]  # config already written when the download starts
     assert load_raw()["storage"]["dir"] == str(new)
@@ -298,7 +298,7 @@ def test_download_runs_after_the_config_is_saved_in_the_new_folder(home):
 def test_download_is_skipped_when_a_new_folder_was_not_saved(home):
     calls, download = _downloads()
     new = home / "elsewhere"
-    s = Session("n", str(new), "", "y", "", "", "y", "n", "")  # ... download yes, save NO
+    s = Session("n", str(new), "y", "", "", "y", "n", "")  # ... download yes, save NO
     s.run(download=download)
     assert calls == [] and "Skipped the small download" in s.text
 
@@ -308,14 +308,14 @@ def test_already_downloaded_model_is_not_offered_again(home):
     model.parent.mkdir(parents=True)
     model.write_bytes(b"x")
     calls, download = _downloads()
-    s = Session("", "", "y", "", "", "")  # voice yes, defaults, then first entry
+    s = Session("", "y", "", "", "")  # voice yes, defaults, then first entry
     s.run(download=download)
     assert "already downloaded" in s.text and calls == []
     assert not any("Download the" in p for p in s.prompts)
 
 
 def test_bad_model_and_language_are_asked_again(home):
-    s = Session("", "", "y", "gigantic", "tiny", "english", "ES", "n", "y", "")
+    s = Session("", "y", "gigantic", "tiny", "english", "ES", "n", "y", "")
     s.run(download=_downloads()[1])
     assert "must be one of" in s.text and "short language code" in s.text
     assert load_raw() == {"transcribe": {"model": "tiny", "language": "es"}}
@@ -329,7 +329,7 @@ def test_config_set_checks_the_language_the_same_way_the_wizard_does(capsys):
 
 
 def test_voice_memo_defaults_follow_what_is_already_there(home):
-    s = Session("", "", "y", "", "", "", "")  # voice yes, model, language, download (default), first entry
+    s = Session("", "y", "", "", "", "")  # voice yes, model, language, download (default), first entry
     calls, download = _downloads()
     s.run(download=download)
     assert any("Will you use voice memos? [y/N]" in p for p in s.prompts)
@@ -339,14 +339,14 @@ def test_voice_memo_defaults_follow_what_is_already_there(home):
     model = home / ".local" / "share" / "rythe" / "models" / "ggml-small.bin"
     model.parent.mkdir(parents=True)
     model.write_bytes(b"x")
-    s = Session("", "", "", "", "", "")
+    s = Session("", "", "", "", "")
     s.run(download=download)
     assert any("Will you use voice memos? [Y/n]" in p for p in s.prompts)
 
 
 def test_missing_voice_tools_are_explained(home, monkeypatch):
     monkeypatch.setattr("rythe.setup.shutil.which", lambda name: None if name in ("ffmpeg", "whisper-cli") else "/x")
-    s = Session("", "", "y", "", "", "n", "")
+    s = Session("", "y", "", "", "n", "")
     s.run(download=_downloads()[1])
     assert "ffmpeg not found" in s.text and "whisper-cli not found" in s.text
 
@@ -357,13 +357,13 @@ def test_failed_download_is_reported_and_setup_carries_on(home):
     def failing(model):
         raise TranscribeError("network down")
 
-    s = Session("", "", "y", "", "", "y", "", "")
+    s = Session("", "y", "", "", "y", "", "")
     assert s.run(download=failing) == 0
     assert "network down" in s.text and "rythe model download small" in s.text
 
 
 def test_saying_no_to_voice_memos_asks_nothing_more(home):
-    s = Session("", "", "", "")
+    s = Session("", "", "")
     s.run()
     assert not any("Which model" in p for p in s.prompts)
 
@@ -380,7 +380,7 @@ def test_first_entry_gets_a_one_time_setup_tip(capsys, monkeypatch):
 
 def test_no_tip_once_a_config_file_exists_or_with_json_or_when_piped(capsys, monkeypatch):
     monkeypatch.setattr("rythe.cli._interactive", lambda: True)
-    main(["config", "set", "resurface.enabled", "true"])  # creates the config file
+    main(["config", "set", "appearance.color", "auto"])  # creates the config file
     capsys.readouterr()
     main(["add", "first, but configured"])
     assert "rythe setup" not in capsys.readouterr().out
@@ -416,7 +416,7 @@ def test_model_list_in_the_wizard_explains_each_model_and_marks_downloaded(home)
     present.parent.mkdir(parents=True)
     present.write_bytes(b"x")
 
-    s = Session("", "", "y", "", "", "n", "")
+    s = Session("", "y", "", "", "n", "")
     s.run(download=_downloads()[1])
     for name, note in transcribe.MODEL_NOTES.items():
         assert note in s.text, name
@@ -426,18 +426,18 @@ def test_model_list_in_the_wizard_explains_each_model_and_marks_downloaded(home)
 
 
 def test_declining_a_download_says_how_to_do_it_later(home):
-    s = Session("", "", "y", "medium", "", "n", "")
+    s = Session("", "y", "medium", "", "n", "")
     s.run(download=_downloads()[1])
     assert "rythe model download medium" in s.text
 
 
 def test_wizard_is_styled_when_color_is_on_and_plain_text_underneath(home):
     ui.set_color(True)
-    s = Session("", "n", "", "y", "")
-    s.run()
+    s = Session("", "y", "medium", "", "n", "y", "")
+    s.run(download=_downloads()[1])
     assert "\x1b[" in s.text  # styled
     plain = ui.strip_ansi(s.text)
-    assert "R Y T H E   S E T U P" in plain and "1/3  WHERE SHOULD YOUR JOURNAL LIVE?" in plain
+    assert "R Y T H E   S E T U P" in plain and "1/2  WHERE SHOULD YOUR JOURNAL LIVE?" in plain
     assert "WRITING PROMPTS" in plain and "You're set" in plain
     assert "Saved to" in plain
 
@@ -449,15 +449,15 @@ def test_wizard_is_styled_when_color_is_on_and_plain_text_underneath(home):
 
 def test_wizard_has_no_escape_codes_when_color_is_off(home):
     ui.set_color(False)
-    s = Session("", "", "", "")
+    s = Session("", "", "")
     s.run()
     assert "\x1b" not in s.text and "\x01" not in s.text
 
 
 def test_only_the_steps_that_ask_something_are_numbered(home):
-    s = Session("", "", "", "")
+    s = Session("", "", "")
     s.run()
     plain = s.text
-    positions = [plain.index(f"{n}/3") for n in range(1, 4)] + [plain.index("WRITING PROMPTS")]
+    positions = [plain.index(f"{n}/2") for n in range(1, 3)] + [plain.index("WRITING PROMPTS")]
     assert positions == sorted(positions)
-    assert "4/3" not in plain and "/4" not in plain.replace(str(home), "")
+    assert "3/2" not in plain and "/3" not in plain.replace(str(home), "")
