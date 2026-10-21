@@ -34,7 +34,7 @@ def test_registry_defaults_match_the_dataclass_defaults():
 
 def test_list_defaults_then_json(capsys):
     code, out, _ = run(capsys, "config", "list")
-    assert code == 0 and "not created yet" in out and "resurface.enabled" in out
+    assert code == 0 and "not created yet" in out and "appearance.color" in out
 
     code, out, _ = run(capsys, "config", "list", "--json")
     payload = json.loads(out)
@@ -44,23 +44,23 @@ def test_list_defaults_then_json(capsys):
 
 
 def test_set_get_unset_round_trip(capsys):
-    assert run(capsys, "config", "set", "resurface.enabled", "off")[0] == 0
-    assert load_raw() == {"resurface": {"enabled": False}}
-    assert load_config().resurface.enabled is False
+    assert run(capsys, "config", "set", "appearance.color", "never")[0] == 0
+    assert load_raw() == {"appearance": {"color": "never"}}
+    assert load_config().appearance.color == "never"
 
-    code, out, _ = run(capsys, "config", "get", "resurface.enabled", "--json")
-    assert json.loads(out) == {"key": "resurface.enabled", "value": False, "default": True, "source": "config file"}
+    code, out, _ = run(capsys, "config", "get", "appearance.color", "--json")
+    assert json.loads(out) == {"key": "appearance.color", "value": "never", "default": "auto", "source": "config file"}
 
     code, out, _ = run(capsys, "config", "list")
-    assert "(config file; default true)" in out
+    assert "(config file; default auto)" in out
 
-    assert run(capsys, "config", "unset", "resurface.enabled")[0] == 0
+    assert run(capsys, "config", "unset", "appearance.color")[0] == 0
     assert load_raw() == {}  # empty section removed
-    assert "already at its default" in run(capsys, "config", "unset", "resurface.enabled")[1]
+    assert "already at its default" in run(capsys, "config", "unset", "appearance.color")[1]
 
 
 def test_set_validates_values(capsys):
-    assert run(capsys, "config", "set", "resurface.enabled", "maybe")[0] == 1
+    assert run(capsys, "config", "set", "appearance.color", "maybe")[0] == 1
     code, _, err = run(capsys, "config", "set", "transcribe.model", "huge")
     assert code == 1 and "tiny" in err
     assert run(capsys, "config", "set", "transcribe.language", "")[0] == 1
@@ -69,8 +69,8 @@ def test_set_validates_values(capsys):
 
 
 def test_unknown_key_suggests_and_exits_1(capsys):
-    code, _, err = run(capsys, "config", "set", "histroy.enabled", "true")
-    assert code == 1 and "unknown setting" in err and "resurface.enabled" in err
+    code, _, err = run(capsys, "config", "set", "appearence.color", "never")
+    assert code == 1 and "unknown setting" in err and "appearance.color" in err
     assert run(capsys, "config", "get", "nope")[0] == 1
     assert run(capsys, "config", "explain", "nope")[0] == 1
 
@@ -88,20 +88,21 @@ def test_set_keeps_other_settings_and_backs_up_comments(capsys):
     config_path().parent.mkdir(parents=True, exist_ok=True)
     config_path().write_text('# my notes\n[transcribe]\nmodel = "medium"\n')
 
-    code, _, err = run(capsys, "config", "set", "resurface.enabled", "false")
+    code, _, err = run(capsys, "config", "set", "appearance.color", "never")
     backup = config_path().with_name(config_path().name + ".bak")
     assert code == 0 and str(backup) in err
-    assert load_raw() == {"transcribe": {"model": "medium"}, "resurface": {"enabled": False}}
+    assert load_raw() == {"transcribe": {"model": "medium"}, "appearance": {"color": "never"}}
     assert "# my notes" in backup.read_text()
 
 
 def test_unknown_keys_in_the_file_are_ignored_but_reported(capsys):
     config_path().parent.mkdir(parents=True, exist_ok=True)
-    config_path().write_text("[resurface]\nenabled = false\ntypo = 1\n[mystery]\nx = 1\n")
+    # [resurface] is what a config from before 0.3.0 may still hold.
+    config_path().write_text('[resurface]\nenabled = false\n[appearance]\ncolor = "never"\ntypo = 1\n[mystery]\nx = 1\n')
 
-    assert load_config().resurface.enabled is False  # no crash
+    assert load_config().appearance.color == "never"  # no crash
     payload = json.loads(run(capsys, "config", "list", "--json")[1])
-    assert set(payload["unknown_keys"]) == {"resurface.typo", "mystery.x"}
+    assert set(payload["unknown_keys"]) == {"resurface.enabled", "appearance.typo", "mystery.x"}
 
 
 def test_invalid_toml_is_a_clean_error(capsys):
@@ -112,8 +113,8 @@ def test_invalid_toml_is_a_clean_error(capsys):
 
 
 def test_explain_one_and_all(capsys):
-    code, out, _ = run(capsys, "config", "explain", "resurface.enabled")
-    assert "older entry" in out and "default: true" in out and "now: true (default)" in out
+    code, out, _ = run(capsys, "config", "explain", "appearance.color")
+    assert "default: auto" in out and "now: auto (default)" in out
 
     out = run(capsys, "config", "explain")[1]
     assert all(s.key in out for s in settings.SETTINGS) and "prompts.<name>" in out

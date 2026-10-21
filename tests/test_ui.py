@@ -93,12 +93,11 @@ COMMANDS = [
     ["list", "--tag", "work"],
     ["search", "coffee"],
     ["search", "co+", "--regex"],
-    ["on-this-day", "--date", "2025-10-04"],
     ["tags"],
     ["status"],
     ["model", "list"],
     ["config", "list"],
-    ["config", "explain", "resurface.enabled"],
+    ["config", "explain", "appearance.color"],
     ["config", "explain"],
     ["prompts", "list"],
     ["prompts", "show", "hard"],
@@ -113,7 +112,6 @@ COMMANDS = [
 def seeded(capsys):
     main(["new", "--at", "2025-10-04T09:00:00+02:00", "--text", "coffee and code #work", "--source", "memo"])
     main(["new", "--at", "2026-10-03T21:30:00+02:00", "--title", "Late", "--text", "a coffee, again #home"])
-    main(["config", "set", "resurface.enabled", "false"])
     capsys.readouterr()
 
 

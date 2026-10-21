@@ -50,9 +50,6 @@ same id exits 3 unless `--force` is given.
 
 - `rythe read` prints a range as prose, oldest first, through your pager (default: the last 7
   days). `rythe show` prints one entry the same way (`--raw` for the stored file).
-- `rythe on-this-day` lists entries from today's date in earlier years.
-- After a new entry is saved on a terminal, one older entry is shown (same day in a past year,
-  else a month ago, else a week ago). Setting `resurface.enabled` controls it.
 - `rythe review` shows the period and then opens the editor with reflection questions. The
   result is saved as a titled entry tagged `#review`. Editor plugins and other clients do the
   same in two steps: `review --json` gives the period, title and question without saving

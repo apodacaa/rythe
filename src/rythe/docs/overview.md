@@ -20,9 +20,8 @@ There are two front doors onto the same data:
   `text` (imported from a file).
 - Writing is made safe: unsaved editor drafts are kept, and deletes only move files to a trash
   folder. Backing up the data folder is up to you (see `rythe docs concepts`).
-- Rereading is built in: `rythe read`, `rythe on-this-day`, and an older entry resurfaced
-  after you save a new one. `rythe review` is a weekly look-back that ends with you writing a
-  reflection.
+- Rereading is built in: `rythe read`, and `rythe review`, a weekly look-back that ends with
+  you writing a reflection.
 - Prompts are always opt-in. A bare `rythe` is a blank page; `--prompt` adds a question below
   it (see `rythe docs prompts`).
 

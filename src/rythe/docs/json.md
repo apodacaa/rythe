@@ -23,24 +23,15 @@ Returned by `new`, `add`, `show`, `tag`, `edit`, `ingest audio|text` and inside 
 }
 ```
 
-`new --json` and `add --json` add one more key, the older entry a person sees after saving (same
-day in a past year, else a month ago, else a week ago), or `null` when there is none or the
-`resurface.enabled` setting is off:
-
-```
-"resurfaced": {"label": "a week ago today", "entry": { …entry object… }}
-```
-
 ## Other shapes
 
-- `list --json`, `on-this-day --json`: an array of entry objects, newest first.
+- `list --json`: an array of entry objects, newest first.
 - `search --json`: `[{"id", "created", "matches": [matching lines]}]`.
 - `tags --json`: `{"tag": count, …}`, most used first.
 - `delete --json`: `{"id", "trashed_at"}`.
 - `ingest seen`: always prints `{"seen": true, "id": "…"}` or `{"seen": false}`; exit 0 if seen, 1
   if not.
-- `status --json`: `{"last_entry_id", "last_entry_at", "days_since", "week_count",
-  "on_this_day_count"}` (nulls and zeros for an empty journal).
+- `status --json`: `{"last_entry_id", "last_entry_at", "days_since", "week_count"}` (nulls and zeros for an empty journal).
 - `config list --json`: `{"path", "exists", "settings": [{"key", "kind", "value", "default",
   "source", "choices", "description", "example", "in_setup"}], "unknown_keys": []}`
   (`in_setup` is true for the settings `rythe setup` asks about, the ones to start with when

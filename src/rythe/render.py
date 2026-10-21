@@ -59,7 +59,7 @@ def render_entries(entries: list[Entry], *, show_id: bool = False) -> str:
     return "\n".join(blocks)
 
 
-# -- shared styling for one-line entry listings (list, search, on-this-day) ---------------------
+# -- shared styling for one-line entry listings (list, search) ---------------------
 
 _SOURCE_COLORS = {"cli": ("dim",), "memo": ("magenta",), "text": ("yellow",)}
 

@@ -20,8 +20,6 @@ Examples:
   rythe list --untagged
   rythe review                              # read your week, then write a #review entry about it
   rythe status                              # last entry, entries this week; also --json
-  rythe on-this-day                        # entries from today's date in any past year
-  rythe on-this-day --date monday           # bare weekday names work; "last monday" doesn't
   rythe tags
   rythe tag 2026-09-30T164608 gratitude focus
   rythe edit 2026-09-30T164608
@@ -37,7 +35,7 @@ With no subcommand (or `rythe write`), opens $EDITOR on a new entry — same as 
 
 Settings and docs (both explain themselves; `rythe docs --all` prints everything):
   rythe config list                         # every setting: value, default, source
-  rythe config set resurface.enabled false  # change one (validated); `config explain` says what each does
+  rythe config set appearance.color never   # change one (validated); `config explain` says what each does
   rythe prompts list                        # the writing prompt sets and what each is for
   rythe docs                                # the built-in guide; `docs --list` for topics
 """
@@ -131,21 +129,6 @@ def _interactive() -> bool:
     return sys.stdout.isatty()
 
 
-def _resurfaced(entry: Entry) -> tuple[str, Entry] | None:
-    """The older entry to show after saving `entry`, if resurfacing is on."""
-    if not load_config().resurface.enabled:
-        return None
-    return store.resurface(entry.created.date())
-
-
-def _print_resurfaced(entry: Entry) -> None:
-    """After saving, show one older entry — rereading is where a journal pays off."""
-    found = _resurfaced(entry)
-    if found:
-        label, old = found
-        print(f"{label}: {_preview(old, 70)}   (rythe show {old.id})")
-
-
 _in_setup = False  # True while the wizard runs, so an entry written from it doesn't advertise it
 
 
@@ -191,15 +174,10 @@ def cmd_new(args: argparse.Namespace) -> int:
     if draft is not None:
         draft.unlink(missing_ok=True)
     if args.json:
-        # The same older entry a person sees after saving, so clients can show it too.
-        found = _resurfaced(entry)
-        payload = _entry_to_dict(entry)
-        payload["resurfaced"] = {"label": found[0], "entry": _entry_to_dict(found[1])} if found else None
-        print(json.dumps(payload, indent=2))
+        print(json.dumps(_entry_to_dict(entry), indent=2))
     else:
         print(render.done("created", entry.id))
         if _interactive():
-            _print_resurfaced(entry)
             _print_setup_tip()
     return 0
 
@@ -361,32 +339,6 @@ def cmd_read(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_on_this_day(args: argparse.Namespace) -> int:
-    target = _parse_date(args.date) if args.date else _now().date()
-    entries = store.on_this_day(
-        target,
-        tags=[normalize_tag(t) for t in args.tag] if args.tag else None,
-        source=args.source,
-    )
-    if args.json:
-        print(json.dumps([_entry_to_dict(e) for e in entries], indent=2))
-        return 0
-
-    if not entries:
-        print(f"nothing written on {target:%B %-d} in past years")
-        return 0
-
-    last_year = None
-    for e in entries:
-        if e.created.year != last_year:
-            print(ui.style(f"{e.created.year}:", "bold", "cyan"))
-            last_year = e.created.year
-        preview = _preview(e)
-        suffix = f"  {preview}" if preview else ""
-        print(render.listing_line(e, preview, indent="  "))
-    return 0
-
-
 def cmd_search(args: argparse.Namespace) -> int:
     if args.regex and not args.query:
         print("rythe: --regex needs a query to match against", file=sys.stderr)
@@ -435,11 +387,6 @@ def _status(now: datetime) -> dict:
         "last_entry_at": last.created.isoformat() if last else None,
         "days_since": (today - last.created.date()).days if last else None,
         "week_count": sum(1 for e in entries if e.created.date() >= week_start),
-        "on_this_day_count": sum(
-            1
-            for e in entries
-            if (e.created.month, e.created.day) == (today.month, today.day) and e.created.year < today.year
-        ),
     }
 
 
@@ -457,8 +404,6 @@ def cmd_status(args: argparse.Namespace) -> int:
     n = status["week_count"]
     print(f"{ui.style('last entry:', 'bold')} {ui.style(when, 'bold', 'cyan')} {ui.style(f'({last:%a %b} {last.day})', 'dim')}")
     print(f"{ui.style('this week:', 'bold')} {ui.style(str(n), 'bold', 'cyan')} {'entry' if n == 1 else 'entries'}")
-    if status["on_this_day_count"]:
-        print(f"{ui.style('on this day:', 'bold')} {ui.style(str(status['on_this_day_count']), 'bold', 'cyan')} from past years")
     return 0
 
 
@@ -901,21 +846,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_search.add_argument("--json", action="store_true")
     p_search.set_defaults(func=cmd_search)
 
-    p_otd = sub.add_parser(
-        "on-this-day", help="entries from this month/day across every year (default: today)"
-    )
-    p_otd.add_argument("--date", metavar="YYYY-MM-DD", help="default: today")
-    p_otd.add_argument("--tag", action="append")
-    p_otd.add_argument("--source", choices=["cli", "memo", "text"])
-    p_otd.add_argument("--json", action="store_true")
-    p_otd.set_defaults(func=cmd_on_this_day)
-
     p_status = sub.add_parser(
         "status",
         help="when you last wrote, and how this week is going (for prompts, status bars, schedulers)",
         description=(
             "Print when you last wrote and how many entries this week. --json gives "
-            "{last_entry_id, last_entry_at, days_since, week_count, on_this_day_count} "
+            "{last_entry_id, last_entry_at, days_since, week_count} "
             "(nulls/zeros for an empty journal) — cheap enough to call from a shell prompt, "
             "status bar or scheduled reminder."
         ),
@@ -961,7 +897,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_cfg_list.set_defaults(func=configcmd.cmd_config_list)
 
     p_cfg_get = config_sub.add_parser("get", help="print one setting's value")
-    p_cfg_get.add_argument("key", help="e.g. resurface.enabled")
+    p_cfg_get.add_argument("key", help="e.g. appearance.color")
     p_cfg_get.add_argument("--json", action="store_true")
     p_cfg_get.set_defaults(func=configcmd.cmd_config_get)
 
@@ -975,7 +911,7 @@ def build_parser() -> argparse.ArgumentParser:
             "The file is rewritten; hand-written comments are saved to config.toml.bak first."
         ),
     )
-    p_cfg_set.add_argument("key", help="e.g. resurface.enabled")
+    p_cfg_set.add_argument("key", help="e.g. appearance.color")
     p_cfg_set.add_argument("values", nargs="+", help="the new value (several for prompts.<name>)")
     p_cfg_set.add_argument("--json", action="store_true")
     p_cfg_set.set_defaults(func=configcmd.cmd_config_set)
@@ -1026,7 +962,7 @@ def build_parser() -> argparse.ArgumentParser:
         "setup",
         help="a short guided setup, or --check to see what this machine has",
         description=(
-            "Walk through the few choices that matter (journal folder, resurfacing, "
+            "Walk through the few choices that matter (journal folder, "
             "voice memos). Safe to re-run: nothing is saved until you confirm. --check reports "
             "which tools are available and what each enables, without asking anything."
         ),

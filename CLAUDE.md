@@ -75,8 +75,8 @@ users back it up however they like. Don't add backup or version-control features
   describes a TUI that no longer exists, so don't use it as a reference).
 - Plain-text output (`read`, `show`, `status`, `review`) is for people and may change; scripts
   use `--json`.
-- `rythe status --json` → `{last_entry_id, last_entry_at, days_since, week_count,
-  on_this_day_count}` (nulls/zeros for an empty journal).
+- `rythe status --json` → `{last_entry_id, last_entry_at, days_since, week_count}`
+  (nulls/zeros for an empty journal).
 - Entry refs: `show`/`edit`/`tag`/`delete` take an id, `last`, `today`, or a unique prefix.
   Ambiguous prefix → exit `1`; no match → exit `2`.
 - `config`, `prompts` and `docs` shapes are in `rythe docs json` (a test keeps the entry
