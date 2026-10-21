@@ -33,11 +33,20 @@ $ rythe review               # read your week, then write a reflection
 
 ## Install
 
-Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
+**macOS and Linux with [Homebrew](https://brew.sh):**
 
 ```
-git clone https://github.com/apodacaa/rythe && cd rythe
-uv tool install .            # puts `rythe` on your PATH (use --editable while developing)
+brew install apodacaa/rythe/rythe
+```
+
+`brew upgrade rythe` updates it.
+
+**Arch Linux (and Omarchy):** an AUR package is coming, so it will be `yay -S rythe`.
+
+**Anywhere else**, with Python 3.11+ and [uv](https://docs.astral.sh/uv/):
+
+```
+uv tool install git+https://github.com/apodacaa/rythe     # puts `rythe` on your PATH
 ```
 
 `rythe --version` says which version you have, and [CHANGELOG.md](CHANGELOG.md) what changed in
