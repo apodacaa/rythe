@@ -42,7 +42,9 @@ day in a past year, else a month ago, else a week ago), or `null` when there is 
 - `status --json`: `{"last_entry_id", "last_entry_at", "days_since", "week_count",
   "on_this_day_count"}` (nulls and zeros for an empty journal).
 - `config list --json`: `{"path", "exists", "settings": [{"key", "kind", "value", "default",
-  "source", "choices", "description", "example"}], "unknown_keys": []}`.
+  "source", "choices", "description", "example", "in_setup"}], "unknown_keys": []}`
+  (`in_setup` is true for the settings `rythe setup` asks about, the ones to start with when
+  helping a person configure rythe).
 - `config get --json`: `{"key", "value", "default", "source"}`; `config set --json`:
   `{"key", "value"}`; `config explain --json`: the same setting objects as `config list`.
 - `setup --check --json`: `{"checks": [{"name", "found", "detail", "needed_for", "hint"}],
@@ -66,7 +68,7 @@ form of `read`; use `list --json`.
 | Code | Meaning |
 |---|---|
 | 0 | ok |
-| 1 | usage error (bad flag, bad date, unknown setting, ambiguous ref, empty entry) |
+| 1 | usage error (bad flag or missing argument, unknown command, bad date, unknown setting, ambiguous ref, empty entry) |
 | 2 | not found (no such entry, file, or prompt set) |
 | 3 | duplicate (`ingest` with a `message_id` that already exists; retry with `--force` only if wanted) |
 

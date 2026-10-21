@@ -92,7 +92,8 @@ def render_config() -> str:
         "```\n\n"
         "`set` and `unset` rewrite the file. If it had hand-written comments they are dropped, so "
         "the old file is first saved as `config.toml.bak` and you are told.",
-        "## Settings",
+        "## Settings\n\nThe ones marked \"asked by `rythe setup`\" are the settings most people want to "
+        "look at first; start there when helping someone configure rythe.",
     ]
     for s in settings.SETTINGS:
         kind = {
@@ -103,6 +104,7 @@ def render_config() -> str:
         }[s.kind]
         out.append(
             f"### `{s.key}`\n\n{s.description}\n\n- type: {kind}\n- default: `{_default(s)}`\n- example: `{s.example}`"
+            + ("\n- asked by `rythe setup`" if s.in_setup else "")
         )
     p = settings.PROMPTS_PATTERN
     out.append(

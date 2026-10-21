@@ -35,6 +35,7 @@ def _row(setting: settings.Setting, raw: dict) -> dict:
         "choices": list(setting.choices),
         "description": setting.description,
         "example": setting.example,
+        "in_setup": setting.in_setup,
     }
 
 
@@ -184,6 +185,8 @@ def _explain_text(setting: settings.Setting, raw: dict) -> str:
         value, source = settings.current(raw, setting)
         lines.append(f"{label('now')} {ui.style(_fmt(value, setting), 'bold')} {ui.style('(' + source + ')', 'dim')}")
     lines.append(f"{label('example')} {ui.style(setting.example, 'bold')}")
+    if setting.in_setup:
+        lines.append(f"{label('asked by')} `rythe setup`")
     return "\n".join(lines)
 
 
