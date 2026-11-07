@@ -872,6 +872,20 @@ def test_review_json_defaults_to_the_last_seven_days(capsys):
     assert payload["entries"] == []
 
 
+def test_review_waits_for_enter_after_showing_the_period_before_the_editor(monkeypatch, capsys):
+    _seed("2026-10-02T09:00:00", "first day")
+    capsys.readouterr()
+    order = []
+    monkeypatch.setattr("rythe.cli._interactive", lambda: True)
+    monkeypatch.setattr("rythe.cli._output", lambda text, **kw: order.append("shown"))
+    monkeypatch.setattr("sys.stdin", type("TTY", (), {"isatty": lambda self: True, "read": lambda self: ""})())
+    monkeypatch.setattr("builtins.input", lambda *a: order.append("enter"))
+    monkeypatch.setattr("rythe.cli.cmd_new", lambda args: order.append("editor") or 0)
+
+    assert main(["review", "--since", "2026-10-01", "--until", "2026-10-07"]) == 0
+    assert order == ["shown", "enter", "editor"]
+
+
 def test_review_stdin_saves_a_titled_review_entry(monkeypatch, capsys):
     import io
 

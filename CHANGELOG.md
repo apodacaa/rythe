@@ -5,6 +5,13 @@ What changed in each version, newest first. The version is in `src/rythe/__init_
 1.0.0 on, a change that breaks the `--json` output, a flag, an exit code or an editor file name
 is a new major version.
 
+## 0.3.1
+
+**`rythe review` waits before opening the editor.** It always printed your week first, but a week
+that fits one screen left the pager at once and the editor covered it, so it looked skipped. On a
+terminal it now stops with "Press Enter to start writing" (Ctrl-C cancels). Pipes, `--no-read`,
+`--json` and `--stdin` are unchanged.
+
 ## 0.3.0
 
 **"On this day" is gone.** Nothing in the research on journaling shows that being shown old entries
