@@ -439,6 +439,16 @@ def cmd_review(args: argparse.Namespace) -> int:
             "entries": [_entry_to_dict(e) for e in period()],
         }, indent=2, ensure_ascii=False))
         return 0
+    drafts = store.list_drafts()
+    if drafts:
+        # The editor would resume that draft: no review questions, and its text saved as the review.
+        stamp = datetime.fromtimestamp(drafts[0].stat().st_mtime).strftime("%a %b %-d, %-I:%M %p")
+        print(
+            f"rythe: you have an unsaved draft from {stamp}; finish it with `rythe write`, "
+            "then run `rythe review`",
+            file=sys.stderr,
+        )
+        return 1
     if not args.no_read:
         entries = period()
         if entries:
