@@ -886,6 +886,17 @@ def test_review_waits_for_enter_after_showing_the_period_before_the_editor(monke
     assert order == ["shown", "enter", "editor"]
 
 
+def test_review_refuses_while_an_unsaved_draft_exists(monkeypatch, capsys, journal_dir):
+    drafts = journal_dir / "drafts"
+    drafts.mkdir(parents=True)
+    (drafts / "rythe-new-20261001T120000.txt").write_text("half a thought")
+    monkeypatch.setattr("rythe.cli._compose_in_editor", lambda *a: pytest.fail("editor opened"))
+
+    assert main(["review"]) == 1
+    assert "unsaved draft" in capsys.readouterr().err
+    assert len(store.list_drafts()) == 1
+
+
 def test_review_stdin_saves_a_titled_review_entry(monkeypatch, capsys):
     import io
 

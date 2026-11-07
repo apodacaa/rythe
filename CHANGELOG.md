@@ -5,6 +5,13 @@ What changed in each version, newest first. The version is in `src/rythe/__init_
 1.0.0 on, a change that breaks the `--json` output, a flag, an exit code or an editor file name
 is a new major version.
 
+## 0.3.2
+
+**`rythe review` stops if you have an unsaved draft.** The editor would have resumed that draft,
+so you got no review questions and its text was saved as your review. It now exits `1` before
+showing the week and tells you to finish the draft with `rythe write` first. `--json` and
+`--stdin` don't use the editor and are unchanged.
+
 ## 0.3.1
 
 **`rythe review` waits before opening the editor.** It always printed your week first, but a week
