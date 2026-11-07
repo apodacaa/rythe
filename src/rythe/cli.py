@@ -443,6 +443,14 @@ def cmd_review(args: argparse.Namespace) -> int:
         entries = period()
         if entries:
             _output(render.render_entries(entries, show_id=False), no_pager=args.no_pager)
+            # A short week fits one screen, so the pager exits at once and the editor would
+            # cover it before it could be read. Wait for the person.
+            if _interactive() and sys.stdin.isatty():
+                try:
+                    input(ui.style("Press Enter to start writing (Ctrl-C to cancel) ", "dim"))
+                except (EOFError, KeyboardInterrupt):
+                    print(file=sys.stderr)
+                    return 1
         else:
             print("nothing written in that period", file=sys.stderr)
     return cmd_new(
